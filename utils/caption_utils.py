@@ -1,3 +1,4 @@
+from xml.parsers.expat import model
 import torch
 import numpy as np
 from nuscenes.utils.geometry_utils import view_points
@@ -130,8 +131,11 @@ def scene_generate_v2(full_prompt, system, processor, model, images=None, do_sam
     if images is None:
         images = []
 
-    content = [{"type": "image"} for _ in range(len(images))]
-    content.append({"type": "text", "text": full_prompt})
+    if isinstance(full_prompt, list):
+        content = full_prompt
+    else:
+        content = [{"type": "image"} for _ in range(len(images))]
+        content.append({"type": "text", "text": full_prompt})
 
     messages = [
         {"role": "system", "content": system},
@@ -148,6 +152,46 @@ def scene_generate_v2(full_prompt, system, processor, model, images=None, do_sam
 
     with torch.no_grad():
         generate_ids = model.generate(**inputs, max_new_tokens=512, do_sample=do_sample)
+
+    generated_ids_trimmed = [
+        out_ids[len(in_ids):] for in_ids, out_ids in zip(inputs["input_ids"], generate_ids)
+    ]
+    caption = processor.batch_decode(
+        generated_ids_trimmed, skip_special_tokens=True, clean_up_tokenization_spaces=False
+    )[0]
+    
+    return messages, caption
+
+def reason_generate(user, system, processor, model, images=None, do_sample=False, max_new_tokens=512, **kwargs):
+    if images is None:
+        images = []
+
+    if isinstance(user, list):
+        content = user
+    else:
+        content = [{"type": "image"} for _ in range(len(images))]
+        content.append({"type": "text", "text": user})
+
+    messages = [
+        {"role": "system", "content": system},
+        {"role": "user", "content": content},
+    ]
+
+    text = processor.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
+    if len(images) > 0:
+        inputs = processor(text=[text], images=images, return_tensors="pt", padding=True)
+    else:
+        inputs = processor(text=[text], return_tensors="pt", padding=True)
+    device = next(model.parameters()).device
+    inputs = {k: v.to(device) if torch.is_tensor(v) else v for k, v in inputs.items()}
+
+    with torch.no_grad():
+        generate_ids = model.generate(
+            **inputs, 
+            max_new_tokens=512, 
+            do_sample=do_sample,
+            **kwargs 
+        )
 
     generated_ids_trimmed = [
         out_ids[len(in_ids):] for in_ids, out_ids in zip(inputs["input_ids"], generate_ids)

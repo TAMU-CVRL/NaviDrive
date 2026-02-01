@@ -43,7 +43,7 @@ class NuscenesData(Dataset):
         data = {}
         keys = ['token', 'raw_images', 'raw_lidar', 'future_waypoints', 
                 'cur_waypoint', 'pre_waypoints', 'instance', 'velocity', 'accel', 
-                'yaw_rate', 'image_paths', 'lidar_path', 'lidar_cs_record']
+                'yaw_rate', 'command', 'image_paths', 'lidar_path', 'lidar_cs_record']
         for key in keys:
             data[key] = []
 
@@ -94,7 +94,8 @@ class NuscenesData(Dataset):
         data['accel'] = torch.stack(data['accel'], dim=0)  # [pre_frames, 2]
         data['yaw_rate'] = torch.stack(data['yaw_rate'], dim=0)  # [pre_frames]
         if self.future_frames != 0:
-            data['future_waypoints'] = torch.cat(data['future_waypoints'], dim=0) # [batch_size, future_frames, waypoint]      
+            data['future_waypoints'] = torch.cat(data['future_waypoints'], dim=0) # [batch_size, future_frames, waypoint]
+        data['command'] = self.classify_command(data['future_waypoints'], data['cur_waypoint']) # [batch_size, command]   
         return data
     
     # Get splits scenes
@@ -286,3 +287,49 @@ class NuscenesData(Dataset):
         all_instances = sorted(all_instances, key=lambda x: x['distance'])
 
         return all_instances
+
+    def classify_command(self, future_waypoints, cur_waypoint, stop_thresh=1.0, lane_width=3.5, uturn_thresh=np.deg2rad(150), turn_thresh=np.deg2rad(45)):
+        # 1. Data Extraction
+        data = future_waypoints.numpy() if isinstance(future_waypoints, torch.Tensor) else future_waypoints
+        pts = data[:, :2]
+        headings = data[:, 2]
+        
+        curr_pose_np = cur_waypoint.numpy().flatten() if isinstance(cur_waypoint, torch.Tensor) else cur_waypoint.flatten()
+        curr_heading = curr_pose_np[2]
+
+        start_pos = pts[0]
+        end_pos = pts[-1]
+        total_dist = np.linalg.norm(end_pos - start_pos)
+
+        # 2. Stop Identification
+        if total_dist < stop_thresh:
+            return "Stop"
+
+        # 3. Reverse Identification
+        start_move_vec = pts[min(5, len(pts)-1)] - start_pos
+        current_heading_vec = np.array([np.cos(curr_heading), np.sin(curr_heading)])
+        if np.dot(start_move_vec, current_heading_vec) < 0:
+            return "Reverse"
+
+        # 4. Cumulative Yaw Calculation
+        yaw_diffs = np.diff(headings)
+        yaw_diffs = (yaw_diffs + np.pi) % (2 * np.pi) - np.pi
+        total_yaw_change = np.sum(yaw_diffs)
+
+        # 5. Lateral Displacement Calculation
+        norm_vec = np.array([-np.sin(curr_heading), np.cos(curr_heading)])
+        lat_offsets = [np.dot(p - start_pos, norm_vec) for p in pts]
+        max_lat_val = np.max(lat_offsets)
+        min_lat_val = np.min(lat_offsets)
+        peak_lat_shift = max_lat_val if abs(max_lat_val) > abs(min_lat_val) else min_lat_val
+        
+        if abs(total_yaw_change) > uturn_thresh:
+            return "U-turn"
+        
+        if abs(total_yaw_change) > turn_thresh:
+            return "Turn Left" if total_yaw_change > 0 else "Turn Right"
+        
+        if abs(peak_lat_shift) > lane_width * 0.5:
+            return "Lane Change Left" if peak_lat_shift > 0 else "Lane Change Right"
+        
+        return "Go Straight"

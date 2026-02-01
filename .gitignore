@@ -1,0 +1,29 @@
+# ignore model checkpoint files
+*.pt
+*.ckpt
+*.pth
+*.h5
+
+# ignore dataset files
+*.png
+*.npy
+*.tar
+*.tmp
+# *.jsonl
+
+# ignore Python cache files
+**/__pycache__/
+*.py[cod]
+
+# ignore system files
+.DS_Store
+.vscode/
+.idea/
+
+# Ignore the folders and everything in it
+expired/
+tb_logs/
+wandb/
+dataset/
+checkpoints/
+results/
