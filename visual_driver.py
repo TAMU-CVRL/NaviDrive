@@ -11,10 +11,10 @@ from nuscenes.nuscenes import NuScenes
 from nuscenes.utils.geometry_utils import transform_matrix
 from utils.results_utils import project_wp_to_image
 
-JSONL_FILE = "driver_predicted_waypoints.jsonl"
+JSONL_FILE = "driver_predicted_waypoints_3.jsonl"
 DATA_ROOT = "/home/ximeng/Dataset/nuscenes_full_v1_0/"
 VERSION = 'v1.0-mini'
-VIDEO_OUTPUT = "driving_prediction.mp4"
+VIDEO_OUTPUT = "driving_prediction_3.mp4"
 FPS = 2
 
 def main():

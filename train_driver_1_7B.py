@@ -17,7 +17,7 @@ import copy
 
 MODEL_ID = "Qwen/Qwen3-1.7B"
 DATA_FILE = "nusscenes_reasons.jsonl"
-OUTPUT_DIR = "./checkpoints/qwen3-1.7b-dllm-sft-0201"
+OUTPUT_DIR = "./checkpoints/qwen3-1.7b-dllm-sft-0203"
 SYSTEM_PROMPT = (
     "You are an expert autonomous driving planning module (Driver). Your goal is to output a safe, smooth, and kinematically feasible future trajectory.\n"
     "Rules:\n"
@@ -132,11 +132,11 @@ def train():
 if __name__ == "__main__":
     wandb.init(
         project="dllm",
-        name="qwen-1.7b-full-sft-0202",
+        name="qwen-1.7b-full-sft-0203",
         config={
             "model": "Qwen3-1.7B",
             "learning_rate": 2e-5,
-            "epochs": 1,
+            "epochs": 3,
         }
     )    
     train()

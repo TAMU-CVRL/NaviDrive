@@ -11,10 +11,10 @@ import re
 from transformers import AutoModelForCausalLM, AutoTokenizer, AutoProcessor
 from utils.caption_utils import reason_generate
 
-MODEL_ID = "checkpoints/qwen3-1.7b-dllm-sft-0202"  # Replace with your local checkpoint path
+MODEL_ID = "checkpoints/qwen3-1.7b-dllm-sft-0203"  # Replace with your local checkpoint path
 DATA_ROOT = "/home/ximeng/Dataset/nuscenes_full_v1_0/"
 INPUT_JSONL = "nusscenes_reasons_mini_0201.jsonl"
-OUTPUT_JSONL = "driver_predicted_waypoints.jsonl"
+OUTPUT_JSONL = "driver_predicted_waypoints_3.jsonl"
 SYSTEM_PROMPT = (
         "You are an expert autonomous driving planning module (Driver). Your goal is to output a safe, smooth, and kinematically feasible future trajectory.\n"
         "Rules:\n"
@@ -64,7 +64,7 @@ def main():
                 f"- Yaw Rate: {data['yr_val']} rad/s.\n"
                 f"- Acceleration (Longitudinal x, Lateral y): {data['acc_val']} m/s^2.\n"
                 f"- Past Trajectory (2Hz): {data['wp_past']} m.\n\n"
-                f"- High-level Command: {data['command']}\n"
+                # f"- High-level Command: {data['command']}\n"
             )
             
             reason = data['reasons'][0] if isinstance(data['reasons'], list) else data['reasons']
