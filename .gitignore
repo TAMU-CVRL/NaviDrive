@@ -11,6 +11,8 @@
 *.tmp
 # *.jsonl
 
+*.mp4
+
 # ignore Python cache files
 **/__pycache__/
 *.py[cod]
@@ -27,3 +29,5 @@ wandb/
 dataset/
 checkpoints/
 results/
+
+nusscenes_reasons_val.jsonl
