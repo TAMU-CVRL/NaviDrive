@@ -288,6 +288,7 @@ class NuscenesData(Dataset):
 
         return all_instances
 
+    #TODO: commands are not accurate enough, need to improve
     def classify_command(self, future_waypoints, cur_waypoint, stop_thresh=1.0, lane_width=3.5, uturn_thresh=np.deg2rad(150), turn_thresh=np.deg2rad(45)):
         # 1. Data Extraction
         data = future_waypoints.numpy() if isinstance(future_waypoints, torch.Tensor) else future_waypoints
@@ -317,19 +318,24 @@ class NuscenesData(Dataset):
         total_yaw_change = np.sum(yaw_diffs)
 
         # 5. Lateral Displacement Calculation
-        norm_vec = np.array([-np.sin(curr_heading), np.cos(curr_heading)])
-        lat_offsets = [np.dot(p - start_pos, norm_vec) for p in pts]
-        max_lat_val = np.max(lat_offsets)
-        min_lat_val = np.min(lat_offsets)
-        peak_lat_shift = max_lat_val if abs(max_lat_val) > abs(min_lat_val) else min_lat_val
+        abs_yaw_change = abs(total_yaw_change)
         
-        if abs(total_yaw_change) > uturn_thresh:
-            return "U-turn"
+        if abs_yaw_change > uturn_thresh:
+                return "U-turn"
         
-        if abs(total_yaw_change) > turn_thresh:
-            return "Turn Left" if total_yaw_change > 0 else "Turn Right"
+        if abs_yaw_change > turn_thresh:
+                return "Turn Left" if total_yaw_change > 0 else "Turn Right"
+
+        # norm_vec = np.array([-np.sin(curr_heading), np.cos(curr_heading)])
+        # lat_offsets = [np.dot(p - start_pos, norm_vec) for p in pts]
+        # final_lat_shift = lat_offsets[-1]        
+        # abs_lat_shift = abs(final_lat_shift)
+        # lc_yaw_tolerance = np.deg2rad(20)
         
-        if abs(peak_lat_shift) > lane_width * 0.5:
-            return "Lane Change Left" if peak_lat_shift > 0 else "Lane Change Right"
+        # if abs_lat_shift > lane_width * 0.5:
+        #     if abs_yaw_change < lc_yaw_tolerance:
+        #         return "Lane Change Left" if final_lat_shift > 0 else "Lane Change Right"
+        #     else:
+        #         return "Go Straight"
         
         return "Go Straight"

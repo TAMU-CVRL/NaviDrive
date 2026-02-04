@@ -108,7 +108,7 @@ def reasonGen(model_id, data_path, output_file, version, system_prompt, is_train
 if __name__ == "__main__":
     model_id = "Qwen/Qwen3-VL-8B-Instruct"
     data_path = Path("/home/ximeng/Dataset/nuscenes_full_v1_0/")
-    output_file = "nusscenes_reasons_val.jsonl"
+    output_file = "nusscenes_reasons_mini_0203.jsonl"
     system_prompt = (
         "You are an expert autonomous driving navigator. Your task is to analyze a 360-degree surround-view driving environment and provide concise, safety-oriented driving guidance.\n"
         "Guidelines:\n"
@@ -120,8 +120,8 @@ if __name__ == "__main__":
     reasonGen(model_id=model_id, 
               data_path=data_path, 
               output_file=output_file, 
-              version='v1.0-trainval', # 'v1.0-mini' or 'v1.0-trainval'
+              version='v1.0-mini', # 'v1.0-mini' or 'v1.0-trainval'
               system_prompt=system_prompt, 
               num_reasons=1, 
-              is_train=1 # 0 train, 1 val
+              is_train=0 # 0 train, 1 val
     )

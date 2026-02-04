@@ -17,7 +17,7 @@ def reasonGen(model_id, data_path, output_file, version, system_prompt, is_train
     processor = AutoProcessor.from_pretrained(model_id)
     model = AutoModelForImageTextToText.from_pretrained(
         model_id, 
-        torch_dtype=torch.bfloat16, 
+        dtype=torch.bfloat16, 
         device_map=device,
         attn_implementation="flash_attention_2"
     )

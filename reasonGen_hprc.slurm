@@ -16,16 +16,23 @@
 module purge 
 export HF_HOME=/scratch/user/ximeng/hf_cache
 
+export SINGULARITY_CACHEDIR=$TMPDIR/.singularity
+module load WebProxy
+
+export HF_TOKEN="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"
 CONDA_ENV_PATH=/scratch/user/ximeng/.conda/envs/dllm
 SQUASHFS_IMAGE=/scratch/group/cvrl/dataset/nuscenes.squashfs
 PYTHON_SCRIPT=/scratch/user/ximeng/dllm/reasonGen_hprc.py
 
+# SIF_IMAGE="/scratch/data/Singularity/images/pytorch:23.06-py3.sif"
+SIF_IMAGE="/scratch/user/ximeng/dllm/pytorch_24.02.sif"
+
 echo "[INFO] Starting NaviDrive Inference with Flash Attention 2..."
 
-apptainer exec --nv \
+singularity exec --nv \
     --bind ${SQUASHFS_IMAGE}:/mnt/nuscenes:image-src=/ \
     --bind /scratch/user/ximeng:/scratch/user/ximeng \
-    /sw/hprc/sw/Apptainer/pytorch_24.03.sif \
+    "$SIF_IMAGE" \
     ${CONDA_ENV_PATH}/bin/python ${PYTHON_SCRIPT}
 
 echo "[INFO] Inference finished."

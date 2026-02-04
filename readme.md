@@ -5,6 +5,8 @@ pip install transformers==5.0.0 accelerate==1.12.0 peft==0.18.1
 
 pip install opencv-python==4.11.0.86
 
+pip install open3d
+
 pip install nuscenes-devkit
 
 wget https://github.com/Dao-AILab/flash-attention/releases/download/v2.8.3/flash_attn-2.8.3+cu12torch2.5cxx11abiFALSE-cp310-cp310-linux_x86_64.whl
