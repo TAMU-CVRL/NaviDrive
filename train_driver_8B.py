@@ -66,7 +66,7 @@ def preprocess_function(examples):
             f"- Yaw Rate: {examples['yr_val'][i]:.2f} rad/s\n"
             f"- Acceleration (Longitudinal x, Lateral y): {examples['acc_val'][i]}\n"
             f"- Past Trajectory (2Hz): {examples['wp_past'][i]}\n"
-            f"- High-level Command: {examples['command'][i]}\n\n"
+            # f"- High-level Command: {examples['command'][i]}\n\n" # Current commands are not correct
         )
         
         driver_user_prompt = (
