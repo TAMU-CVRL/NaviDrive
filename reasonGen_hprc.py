@@ -44,6 +44,7 @@ def reasonGen(model_id, data_path, output_file, version, system_prompt, is_train
                 yaw_rate = sample['yaw_rate']
                 future_waypoints = sample['future_waypoints']
                 command = sample['command']
+                image_paths = sample['image_paths'][-1] # Get the latest frame image paths
                 
                 new_order = [2, 3, 4, 5, 0, 1]
                 current_images = raw_images[-1]
@@ -66,7 +67,7 @@ def reasonGen(model_id, data_path, output_file, version, system_prompt, is_train
                     f"- Yaw Rate: {yr_val:.2f} rad/s.\n"
                     f"- Acceleration (Longitudinal x, Lateral y): ({acc_val[0]:.2f}, {acc_val[1]:.2f}) m/s^2.\n"
                     f"- Past Trajectory (2Hz): {wp_past} m.\n\n"
-                    f"High-level Command: {command}\n"
+#                    f"- High-level Command: {command}\n"
                 )
                 
                 user_prompt = (
@@ -95,11 +96,12 @@ def reasonGen(model_id, data_path, output_file, version, system_prompt, is_train
                 data_record = {
                     "token": token,
                     "wp_past": wp_past,
+                    "wp_future": wp_future,
                     "vel_val": vel_val,
                     "acc_val": acc_val,
                     "yr_val": yr_val,
                     "command": command,
-                    "wp_future": wp_future,
+                    "image_paths": image_paths,
                     "reasons": reasons
                 }
 
@@ -111,7 +113,8 @@ def reasonGen(model_id, data_path, output_file, version, system_prompt, is_train
                 continue
 
 if __name__ == "__main__":
-    model_id = "Qwen/Qwen3-VL-30B-A3B-Instruct"
+#    model_id = "Qwen/Qwen3-VL-30B-A3B-Instruct" # MOE model, existing some issues
+    model_id = "Qwen/Qwen3-VL-32B-Instruct"
     data_path = Path("/mnt/nuscenes")
     if not data_path.exists() or not any(data_path.iterdir()):
         raise FileNotFoundError(f"Data path {data_path} does not exist or is empty: {list(data_path.glob('*'))}")
@@ -133,6 +136,6 @@ if __name__ == "__main__":
         version='v1.0-trainval',
         system_prompt=system_prompt, 
         num_reasons=1, 
-        is_train=1 # 0 train, 1 val
+        is_train=0 # 0 train, 1 val
     )
     

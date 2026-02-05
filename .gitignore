@@ -9,7 +9,7 @@
 *.npy
 *.tar
 *.tmp
-# *.jsonl
+*.jsonl
 
 *.mp4
 *.slurm

@@ -37,6 +37,7 @@ def reasonGen(model_id, data_path, output_file, version, system_prompt, is_train
                 yaw_rate = sample['yaw_rate']
                 future_waypoints = sample['future_waypoints']
                 command = sample['command']
+                image_paths = sample['image_paths'][-1] # Get the latest frame image paths
                 
                 new_order = [2, 3, 4, 5, 0, 1]
                 current_images = raw_images[-1]
@@ -59,7 +60,7 @@ def reasonGen(model_id, data_path, output_file, version, system_prompt, is_train
                     f"- Yaw Rate: {yr_val:.2f} rad/s.\n"
                     f"- Acceleration (Longitudinal x, Lateral y): ({acc_val[0]:.2f}, {acc_val[1]:.2f}) m/s^2.\n"
                     f"- Past Trajectory (2Hz): {wp_past} m.\n\n"
-                    f"High-level Command: {command}\n"
+                    # f"- High-level Command: {command}\n"
                 )
                 
                 user_prompt = (
@@ -88,11 +89,12 @@ def reasonGen(model_id, data_path, output_file, version, system_prompt, is_train
                 data_record = {
                     "token": token,
                     "wp_past": wp_past,
+                    "wp_future": wp_future,
                     "vel_val": vel_val,
                     "acc_val": acc_val,
                     "yr_val": yr_val,
-                    "command": command,
-                    "wp_future": wp_future,
+                    "command": command, # not accurate
+                    "image_paths": image_paths,
                     "reasons": reasons
                 }
 
@@ -108,7 +110,7 @@ def reasonGen(model_id, data_path, output_file, version, system_prompt, is_train
 if __name__ == "__main__":
     model_id = "Qwen/Qwen3-VL-8B-Instruct"
     data_path = Path("/home/ximeng/Dataset/nuscenes_full_v1_0/")
-    output_file = "nusscenes_reasons_mini_0203.jsonl"
+    output_file = "nusscenes_reasons_v2.jsonl"
     system_prompt = (
         "You are an expert autonomous driving navigator. Your task is to analyze a 360-degree surround-view driving environment and provide concise, safety-oriented driving guidance.\n"
         "Guidelines:\n"
@@ -120,7 +122,7 @@ if __name__ == "__main__":
     reasonGen(model_id=model_id, 
               data_path=data_path, 
               output_file=output_file, 
-              version='v1.0-mini', # 'v1.0-mini' or 'v1.0-trainval'
+              version='v1.0-trainval', # 'v1.0-mini' or 'v1.0-trainval'
               system_prompt=system_prompt, 
               num_reasons=1, 
               is_train=0 # 0 train, 1 val
