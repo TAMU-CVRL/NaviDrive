@@ -23,7 +23,7 @@ def calculate_metrics(gt, pred, threshold=2.0):
         "l2_1s": errors[1] if min_len > 1 else np.nan,
         "l2_2s": errors[3] if min_len > 3 else np.nan,
         "l2_3s": errors[5] if min_len > 5 else np.nan,
-        "l2_6s": errors[11] if min_len > 11 else errors[-1], # 6s即为FDE
+        "l2_6s": errors[11] if min_len > 11 else errors[-1], # 6s is the last point
         "ade": np.mean(errors)
     }
     
