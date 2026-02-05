@@ -12,6 +12,34 @@ from utils.caption_utils import reason_generate
 from nuscenes.nuscenes import NuScenes
 from data.nuscenes_data import NuscenesData
 
+import torch
+from torch.utils.data import DataLoader, Dataset
+
+class ParallelNuscenesDataset(Dataset):
+    def __init__(self, base_dataset):
+        self.base_dataset = base_dataset
+        self.new_order = [2, 3, 4, 5, 0, 1]
+
+    def __len__(self):
+        return len(self.base_dataset)
+
+    def __getitem__(self, idx):
+        sample = self.base_dataset[idx]
+        current_images = sample['raw_images'][-1]
+        
+        pil_images = []
+        for i in self.new_order:
+            img_np = current_images[i].permute(1, 2, 0).cpu().numpy()
+            img_pil = Image.fromarray(img_np.astype('uint8'))
+            img_pil = resize_long_edge(img_pil, 512)
+            pil_images.append(img_pil)
+        
+        sample['processed_pil_images'] = pil_images
+        return sample
+    
+def simple_collate_fn(batch):
+    return batch[0]
+
 def reasonGen(model_id, data_path, output_file, version, system_prompt, is_train=0, pre_frame=4, future_frame=12, num_reasons=3, device="auto"):
     print(f"Loading model: {model_id}...")
     processor = AutoProcessor.from_pretrained(model_id)
@@ -24,20 +52,27 @@ def reasonGen(model_id, data_path, output_file, version, system_prompt, is_train
 
     print(f"Loading NuScenes dataset from {data_path}...")
     nusc = NuScenes(version=version, dataroot=data_path)
-    dataset = NuscenesData(nusc, is_train, pre_frame, future_frame)
+    base_dataset = NuscenesData(nusc, is_train, pre_frame, future_frame)
 
-    print(f"Starting inference on {len(dataset)} samples...")
+    print(f"Starting inference on {len(base_dataset)} samples...")
+    
+    dataset = ParallelNuscenesDataset(base_dataset)
+    dataloader = DataLoader(
+        dataset, 
+        batch_size=1, 
+        num_workers=12,
+        shuffle=False,
+        pin_memory=False,
+        collate_fn=simple_collate_fn
+    )
     
     output_path = Path(output_file)
     output_path.parent.mkdir(parents=True, exist_ok=True)
     
     with open(output_file, 'a', encoding='utf-8') as f:
-        for i in tqdm(range(len(dataset))):
+        for i, sample in enumerate(tqdm(dataloader)):
             try:
-                sample = dataset[i]
                 token = sample['token']
-                
-                raw_images = sample['raw_images']
                 pre_waypoints = sample['pre_waypoints']
                 velocity = sample['velocity']
                 acceleration = sample['accel']
@@ -45,16 +80,8 @@ def reasonGen(model_id, data_path, output_file, version, system_prompt, is_train
                 future_waypoints = sample['future_waypoints']
                 command = sample['command']
                 image_paths = sample['image_paths'][-1] # Get the latest frame image paths
+                pil_images = sample['processed_pil_images']
                 
-                new_order = [2, 3, 4, 5, 0, 1]
-                current_images = raw_images[-1]
-                pil_images = []
-                for idx in new_order:
-                    img_np = current_images[idx].permute(1, 2, 0).cpu().numpy()
-                    img_pil = Image.fromarray(img_np.astype('uint8'))
-                    img_pil = resize_long_edge(img_pil, 512)
-                    pil_images.append(img_pil)
-
                 pts = pre_waypoints.cpu().numpy().tolist()
                 wp_past = ", ".join([f"({pt[0]:.2f}, {pt[1]:.2f})" for pt in pts])
                 vel_val = round(velocity[-1].item(), 2)

@@ -83,7 +83,7 @@ def process_eval(input_file, threshold=2.0):
         for line in f:
             try:
                 data = json.loads(line)
-                res = calculate_metrics(data['gt_waypoints'], data['predicted_output'], threshold=threshold)
+                res = calculate_metrics(data['gt_waypoints'], data['pred_waypoints'], threshold=threshold)
                 all_results.append(res)
             except Exception as e:
                 print(f"Skipping malformed line: {e}")
@@ -118,7 +118,7 @@ def process_eval(input_file, threshold=2.0):
     
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Calculate evaluation metrics (ADE/FDE)")
-    parser.add_argument("--eval_data", type=str, default="driver_predicted_waypoints_3.jsonl", help="Path to the evaluation data JSONL file")
+    parser.add_argument("--eval_data", type=str, default="eval_results_8B.jsonl", help="Path to the evaluation data JSONL file")
     parser.add_argument("--threshold", type=float, default=2.0, help="Failure threshold in meters")
     args = parser.parse_args()
     process_eval(args.eval_data, threshold=args.threshold)

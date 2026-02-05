@@ -93,7 +93,7 @@ def main():
             record = {
                 "token": data['token'],
                 "gt_waypoints": gt_pts.tolist(),
-                "predicted_output": pred_pts.tolist(),
+                "pred_waypoints": pred_pts.tolist(),
                 "reasons": data['reasons'],
             }
             f_out.write(json.dumps(record) + "\n")
