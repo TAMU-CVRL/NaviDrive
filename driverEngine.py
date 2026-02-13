@@ -30,6 +30,7 @@ class driverEngine():
         self.name = cfg["Name"]
         self.model_id = cfg["Model"]["model_id"]
         self.attention_type = cfg["Model"]["attention"]
+        self.date_str = datetime.now().strftime("%d%H%M")
         
         # Quantization & LoRA
         self.enable_quant = cfg["Model"]["Quantization"]["enable_quantization"]
@@ -57,7 +58,7 @@ class driverEngine():
     def init_wandb(self):
         wandb.init(
             project="dllm",
-            name=self.name,
+            name=self.name + "_" + self.date_str,
             config={
                 "model_id": self.model_id,
                 "attention_type": self.attention_type,
@@ -161,8 +162,7 @@ class driverEngine():
         self.init_wandb()
         self.load_dataset()
         print(f"Hyperparameters:\n {self.hyper_info}")
-        date_str = datetime.now().strftime("%d%H%M")
-        output_dir = os.path.join("checkpoints", f"{self.name}_{date_str}")
+        output_dir = os.path.join("checkpoints", f"{self.name}_{self.date_str}")
         
         # SFTTrainer configuration
         sft_config = SFTConfig(
@@ -234,7 +234,7 @@ class driverEngine():
         )
                 
     def inference(self, inference_path=None):
-        output_dir = os.path.join("results/inference", f"{self.name}_inference.jsonl")
+        output_dir = os.path.join("results/inference", f"{self.name}_{self.date_str}.jsonl")
         os.makedirs(os.path.dirname(output_dir), exist_ok=True)
         with open(inference_path or self.mini_data_path, 'r', encoding='utf-8') as f_in, \
              open(output_dir, 'w', encoding='utf-8') as f_out:
@@ -299,7 +299,8 @@ class driverEngine():
         with open(eval_path, 'r', encoding='utf-8') as f:
             for line in f:
                 data = json.loads(line)
-                res = calculate_metrics(data['gt_waypoints'], data['pred_waypoints'])
+                pred_key = 'pred_waypoints' if 'pred_waypoints' in data else 'predicted_output'
+                res = calculate_metrics(data['gt_waypoints'], data[pred_key])
                 all_results.append(res)
         
         if not all_results:
@@ -317,9 +318,8 @@ class driverEngine():
 
         output_dir = "results"
         os.makedirs(output_dir, exist_ok=True)
-        
         date_str = datetime.now().strftime("%Y%m%d")
-        output_path = os.path.join(output_dir, f"{date_str}_results.txt")
+        output_path = os.path.join(output_dir, f"results_{date_str}.txt")
         hyper_info = self.hyper_info
         result_text = format_results(avg_metrics, eval_path, len(all_results), self.cfg["Eval"]["threshold"])
         
@@ -337,8 +337,7 @@ class driverEngine():
         os.makedirs("results/videos", exist_ok=True)
         nuscenes_version = "v1.0-trainval" if eval_path else "v1.0-mini"
         nusc = self.get_nusc(version=nuscenes_version)
-        date_str = datetime.now().strftime("%d%H%M")
-        output_file = os.path.join("results/videos", f"{self.name}_{date_str}.mp4")
+        output_file = os.path.join("results/videos", f"{self.name}_{self.date_str}.mp4")
 
         with open(input_file, 'r') as f:
             lines = f.readlines() 
@@ -362,8 +361,7 @@ class driverEngine():
         os.makedirs("results/images", exist_ok=True)
         nuscenes_version = "v1.0-trainval" if eval_path else "v1.0-mini"
         nusc = self.get_nusc(version=nuscenes_version)
-        date_str = datetime.now().strftime("%d%H%M")
-        output_dir = os.path.join("results/images", f"{self.name}_{date_str}")
+        output_dir = os.path.join("results/images", f"{self.name}_{self.date_str}")
         os.makedirs(output_dir, exist_ok=True)
         
         with open(input_file, 'r') as f:
@@ -432,10 +430,9 @@ class driverEngine():
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Train a samll-size driver LLM")
     parser.add_argument("--config", type=str, default="default.yaml", help="Path to the configuration YAML file")
-    parser.add_argument("--eval_path", type=str, help="Path to evaluation dataset (JSONL)")
-    
     args = parser.parse_args()
     config = load_config(args.config)
-    eval_path = args.eval_path
     trainer = driverEngine(config)
-    trainer.train()
+    trainer.load_model()
+    print(trainer.model_info)
+    print(trainer.hyper_info)
