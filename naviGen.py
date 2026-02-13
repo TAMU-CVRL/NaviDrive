@@ -94,7 +94,7 @@ def reasonGen(model_id, data_path, output_file, version, system_prompt, is_train
                 # calculate actions
                 dt = 0.5 # 2Hz
                 v0 = velocity[-1].item()
-                a0 = acceleration[-1].item()
+                a0 = acceleration[-1][0].item() # longitudinal acceleration
                 action_past = compute_action(pre_waypoints, dt, v0, a0)
                 action_future = compute_action(future_waypoints, dt, v0, a0)
                 

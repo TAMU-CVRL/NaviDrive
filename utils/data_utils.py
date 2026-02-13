@@ -298,7 +298,11 @@ def lsm_tikhonov(x, y, theta, v0, a0, dt, lambda_reg=0.1):
     # Tikhonov for kappa (penalizes steering rate)
     # (diag(coeff)^2 + lambda * D.T @ D) kappa = diag(coeff) @ d_theta
     W = np.diag(denom)
-    lhs_k = W.T @ W + lambda_reg * D.T @ D
+    D_k = np.zeros((num_vars - 1, num_vars))
+    for i in range(num_vars - 1):
+        D_k[i, i] = -1
+        D_k[i, i+1] = 1
+    lhs_k = W.T @ W + lambda_reg * D_k.T @ D_k
     rhs_k = W.T @ d_theta
     kappa = solve(lhs_k, rhs_k)
 
