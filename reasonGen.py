@@ -97,7 +97,7 @@ def reasonGen(model_id, data_path, output_file, version, system_prompt, is_train
                     "vel_val": vel_val,
                     "acc_val": acc_val,
                     "yr_val": yr_val,
-                    "command": command, # not accurate
+                    # "command": command, # not accurate
                     "image_paths": image_paths,
                     "reasons": reasons
                 }

@@ -161,7 +161,7 @@ class driverEngine():
         self.init_wandb()
         self.load_dataset()
         print(f"Hyperparameters:\n {self.hyper_info}")
-        date_str = datetime.now().strftime("%Y%m%d")
+        date_str = datetime.now().strftime("%d%H%M")
         output_dir = os.path.join("checkpoints", f"{self.name}_{date_str}")
         
         # SFTTrainer configuration
@@ -225,10 +225,17 @@ class driverEngine():
             attn_implementation=self.attention_type
         )
         print("Model loaded successfully from checkpoint.")
-        
+        processor_model = self.model_id if is_visual_model else "Qwen/Qwen3-VL-8B-Instruct"
+        self.processor = AutoProcessor.from_pretrained(
+            processor_model,
+            min_pixels=128*28*28,
+            max_pixels=512*28*28, # limit image resolution
+            trust_remote_code=True
+        )
+                
     def inference(self, inference_path=None):
-        self.load_model()
-        output_dir = os.path.join("results", f"{self.name}_inference.jsonl")
+        output_dir = os.path.join("results/inference", f"{self.name}_inference.jsonl")
+        os.makedirs(os.path.dirname(output_dir), exist_ok=True)
         with open(inference_path or self.mini_data_path, 'r', encoding='utf-8') as f_in, \
              open(output_dir, 'w', encoding='utf-8') as f_out:
             lines = f_in.readlines()
@@ -313,19 +320,25 @@ class driverEngine():
         
         date_str = datetime.now().strftime("%Y%m%d")
         output_path = os.path.join(output_dir, f"{date_str}_results.txt")
+        hyper_info = self.hyper_info
         result_text = format_results(avg_metrics, eval_path, len(all_results), self.cfg["Eval"]["threshold"])
         
         with open(output_path, 'a', encoding='utf-8') as f_out:
+            # f_out.write("="*100)
+            f_out.write(hyper_info)
             f_out.write(result_text)
+            f_out.write("="*100 + "\n")
 
         print(result_text)
         print(f"Results saved to: {output_path}")
         
     def eval_video(self, eval_path=None, start_idx=0, end_idx=None):
         input_file = eval_path if eval_path else self.mini_data_path
+        os.makedirs("results/videos", exist_ok=True)
         nuscenes_version = "v1.0-trainval" if eval_path else "v1.0-mini"
         nusc = self.get_nusc(version=nuscenes_version)
-        output_file = os.path.join("results", f"{self.name}.mp4")
+        date_str = datetime.now().strftime("%d%H%M")
+        output_file = os.path.join("results/videos", f"{self.name}_{date_str}.mp4")
 
         with open(input_file, 'r') as f:
             lines = f.readlines() 
@@ -346,9 +359,11 @@ class driverEngine():
         
     def eval_images(self, eval_path=None, start_idx=0, end_idx=None):
         input_file = eval_path if eval_path else self.mini_data_path
+        os.makedirs("results/images", exist_ok=True)
         nuscenes_version = "v1.0-trainval" if eval_path else "v1.0-mini"
         nusc = self.get_nusc(version=nuscenes_version)
-        output_dir = os.path.join("results", f"{self.name}_images")
+        date_str = datetime.now().strftime("%d%H%M")
+        output_dir = os.path.join("results/images", f"{self.name}_{date_str}")
         os.makedirs(output_dir, exist_ok=True)
         
         with open(input_file, 'r') as f:
@@ -396,9 +411,10 @@ class driverEngine():
     @property
     def hyper_info(self):
         info = (
-            f"\n{'='*80}\n"
+            f"\n{'='*85}\n"
             f"Training Hyperparameters:\n"
-            f"{'='*80}\n"
+            f"{'='*85}\n"
+            f"• Model:                  {self.model_id}\n"
             f"• Epochs:                 {self.epochs}\n"
             f"• Batch Size:             {self.batch_size}\n"
             f"• Gradient Accumulation:  {self.gradient_accumulation_steps}\n"
@@ -406,9 +422,10 @@ class driverEngine():
             f"• LR Scheduler:           {self.lr_scheduler_type}\n"
             f"• Optimizer:              {self.optimizer}\n"
             f"• Weight Decay:           {self.weight_decay}\n"
-            f"• Log To:                {self.log_to}\n"
-            f"• Max Length:            {self.max_length}\n"
-            f"{'='*80}\n"
+            f"• Log To:                 {self.log_to}\n"
+            f"• Max Length:             {self.max_length}\n"
+            f"• LoRA:                   {self.enable_quant}\n"
+            f"{'='*85}\n"
         )
         return info
 

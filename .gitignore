@@ -9,10 +9,8 @@
 *.npy
 *.tar
 *.tmp
-*.jsonl
-
 *.mp4
-*.slurm
+
 # ignore Python cache files
 **/__pycache__/
 *.py[cod]
@@ -28,7 +26,6 @@ tb_logs/
 wandb/
 dataset/
 checkpoints/
-results/
-figures/
-
-nusscenes_reasons_val.jsonl
+results/images/
+results/videos/
+results/inference/
