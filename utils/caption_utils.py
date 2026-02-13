@@ -4,6 +4,7 @@ import numpy as np
 from nuscenes.utils.geometry_utils import view_points
 from pyquaternion import Quaternion
 from collections import Counter
+import re
 
 def describe_camera_annotations(nusc, sample_record, camera_name, box_vis_level=1):
     cam_token = sample_record["data"][camera_name]
@@ -215,3 +216,15 @@ def get_cardinal_direction(x, y):
     if -112.5 < angle <= -67.5: return "to the right"
     if -67.5 < angle <= -22.5: return "front-right"
     return "nearby"
+
+def parse_waypoints(vlm_str):
+    pattern = r"\((-?\d+\.?\d*),\s*(-?\d+\.?\d*)\)"
+    matches = re.findall(pattern, vlm_str)
+    
+    if matches:
+        waypoints = np.array(matches, dtype=float)
+        return waypoints
+    else:
+        print("Warning: No waypoints found in VLM output!")
+        return np.array([])
+    

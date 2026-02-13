@@ -15,7 +15,11 @@ from data.nuscenes_data import NuscenesData
 
 def reasonGen(model_id, data_path, output_file, version, system_prompt, is_train = 0, pre_frame = 4, future_frame = 12, num_reasons = 3, device = "auto"):
     print(f"Loading model: {model_id}...")
-    processor = AutoProcessor.from_pretrained(model_id)
+    processor = AutoProcessor.from_pretrained(
+        model_id, 
+        min_pixels=128*28*28,
+        max_pixels=512*28*28 
+    )
     model = AutoModelForImageTextToText.from_pretrained(model_id, dtype=torch.bfloat16, device_map=device)
 
     print("Loading NuScenes dataset...")
@@ -45,7 +49,7 @@ def reasonGen(model_id, data_path, output_file, version, system_prompt, is_train
                 for idx in new_order:
                     img_np = current_images[idx].permute(1, 2, 0).cpu().numpy()
                     img_pil = Image.fromarray(img_np.astype('uint8'))
-                    img_pil = resize_long_edge(img_pil, 512)
+                    # img_pil = resize_long_edge(img_pil, 512)
                     pil_images.append(img_pil)
 
                 pts = pre_waypoints.cpu().numpy().tolist()
@@ -110,7 +114,7 @@ def reasonGen(model_id, data_path, output_file, version, system_prompt, is_train
 if __name__ == "__main__":
     model_id = "Qwen/Qwen3-VL-8B-Instruct"
     data_path = Path("/home/ximeng/Dataset/nuscenes_full_v1_0/")
-    output_file = "nusscenes_reasons_v2.jsonl"
+    output_file = "nusscenes_reasons_test.jsonl"
     system_prompt = (
         "You are an expert autonomous driving navigator. Your task is to analyze a 360-degree surround-view driving environment and provide concise, safety-oriented driving guidance.\n"
         "Guidelines:\n"

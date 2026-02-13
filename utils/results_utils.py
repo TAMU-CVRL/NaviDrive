@@ -5,6 +5,8 @@ from mpl_toolkits.mplot3d import Axes3D
 from pyquaternion import Quaternion
 import cv2
 import torch
+from datetime import datetime
+import json
 
 def save_predicated_waypoints(pre_waypoints, gt_waypoints, index):
     # pre_waypoints: [pre_frames, 3]  nparray
@@ -287,3 +289,106 @@ def transform_matrix(translation: np.ndarray = np.array([0, 0, 0]),
         tm[:3, 3] = np.transpose(np.array(translation))
 
     return tm
+
+def calculate_metrics(gt, pred, threshold=2.0):
+    """
+    gt: np.array (N, 2)
+    pred: np.array (N, 2)
+    """
+    gt = np.array(gt)
+    pred = np.array(pred)
+    
+    min_len = min(len(gt), len(pred))
+    gt, pred = gt[:min_len], pred[:min_len]
+    
+    # L2 Distance
+    errors = np.linalg.norm(gt - pred, axis=1)
+    
+    # 1s->idx 1, 2s->idx 3, 3s->idx 5, 6s->idx 11
+    metrics = {
+        "l2_1s": errors[1] if min_len > 1 else np.nan,
+        "l2_2s": errors[3] if min_len > 3 else np.nan,
+        "l2_3s": errors[5] if min_len > 5 else np.nan,
+        "l2_6s": errors[11] if min_len > 11 else errors[-1], # 6s is the last point
+        "ade": np.mean(errors)
+    }
+    
+    # Failure rate
+    metrics['is_failure'] = 1 if metrics['l2_6s'] > threshold else 0
+    
+    return metrics
+
+def format_results(avg_metrics, input_file, total_samples, threshold):
+    date_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    
+    width = 85
+    double_line = "=" * width
+    single_line = "-" * width
+
+    header_section = (
+        f"{double_line}\n"
+        f"  TRAJECTORY EVALUATION REPORT  |  {date_str}\n"
+        f"{double_line}\n"
+        f"  [Input File]  : {input_file}\n"
+        f"  [Sample Count]: {total_samples}\n"
+        f"  [Failure Thresh] : {threshold} m\n"
+        f"{single_line}\n"
+    )
+    
+    table_header = (
+        f"  {'Metric':<15} | {'1.0s':<10} | {'2.0s':<10} | {'3.0s':<10} | {'6.0s (FDE)':<12} | {'Avg (ADE)':<10}\n"
+        f"  {'-'*15}-|-{'-'*10}-|-{'-'*10}-|-{'-'*10}-|-{'-'*12}-|-{'-'*10}\n"
+    )
+    
+    table_row = (
+        f"  {'L2 Error (m)':<15} | "
+        f"{avg_metrics['L2_1s']:<10.3f} | "
+        f"{avg_metrics['L2_2s']:<10.3f} | "
+        f"{avg_metrics['L2_3s']:<10.3f} | "
+        f"{avg_metrics['L2_6s']:<12.3f} | "
+        f"{avg_metrics['ADE_avg']:<10.3f}\n"
+    )
+    
+    summary_section = (
+        f"{single_line}\n"
+        f"  {'OVERALL PERFORMANCE':<15}\n"
+        f"  > Failure Rate : {avg_metrics['Failure_Rate']:>6.2f} %\n"
+        f"  > Reliability  : {100 - avg_metrics['Failure_Rate']:>6.2f} % (within {threshold}m)\n"
+        f"{double_line}\n"
+    )
+    
+    return header_section + table_header + table_row + summary_section
+
+def render_frame(nusc, line_data):
+        """Helper to process a single line of data and return the visualized image."""
+        data = json.loads(line_data)
+        
+        # Handle list vs string token format safely
+        token = data['token'][0] if isinstance(data['token'], list) else data['token']
+        
+        # Get the image from NuScenes
+        sample_rec = nusc.get('sample', token)
+        cam_data = nusc.get('sample_data', sample_rec['data']['CAM_FRONT'])
+        img_path = os.path.join(nusc.dataroot, cam_data['filename'])
+        raw_img = cv2.imread(img_path)
+
+        pred_key = 'pred_waypoints' if 'pred_waypoints' in data else 'predicted_output'
+        pred_pts = np.array(data[pred_key], dtype=np.float32)
+        gt_pts = np.array(data['gt_waypoints'], dtype=np.float32)
+
+        # 1. Draw predicted waypoints (Red)
+        vis_img = project_wp_to_image(
+            nusc, token, pred_pts, raw_img,
+            color_waypoints=(255, 0, 0),
+            color_polygon=(200, 0, 0),
+            plot_polygon=True
+        )
+
+        # 2. Draw ground truth waypoints (Green)
+        vis_img = project_wp_to_image(
+            nusc, token, gt_pts, vis_img,
+            color_waypoints=(0, 255, 0),
+            plot_polygon=False
+        )
+        
+        return vis_img, token, cam_data['width'], cam_data['height']

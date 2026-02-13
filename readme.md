@@ -1,7 +1,9 @@
 ```
 pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121
 
-pip install transformers==5.0.0 accelerate==1.12.0 peft==0.18.1
+pip install transformers==5.1.0 accelerate==1.12.0 peft==0.18.1
+
+pip install -U bitsandbytes>=0.46.1
 
 pip install opencv-python==4.11.0.86
 
