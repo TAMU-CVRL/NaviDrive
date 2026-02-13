@@ -341,6 +341,37 @@ def compute_trajectory(accel, kappa, x0, y0, theta0, v0, dt):
         
     return x, y, theta, v
 
+def compute_trajectory_2(pred_actions, x0, y0, theta0, v0, dt) -> np.ndarray:
+    actions = np.array(pred_actions)
+
+    # (N, 2) -> [[a, k], [a, k], ...]
+    accel = actions[:, 0]
+    kappa = actions[:, 1]
+    
+    n = len(accel) + 1
+    
+    x = np.zeros(n)
+    y = np.zeros(n)
+    theta = np.zeros(n)
+    v = np.zeros(n)
+    
+    x[0], y[0], theta[0], v[0] = x0, y0, theta0, v0
+    
+    for i in range(len(accel)):
+        # update velocity v
+        v[i+1] = v[i] + accel[i] * dt
+        
+        # theta^{i+1} = theta^i + dt * k^i * v^i + (dt^2 / 2) * k^i * a^i
+        theta[i+1] = theta[i] + dt * kappa[i] * v[i] + (0.5 * dt**2) * kappa[i] * accel[i]
+        
+        # x^{i+1} = x^i + (dt/2) * (v^i*cos(theta^i) + v^{i+1}*cos(theta^{i+1}))
+        x[i+1] = x[i] + (dt / 2.0) * (v[i] * np.cos(theta[i]) + v[i+1] * np.cos(theta[i+1]))
+        y[i+1] = y[i] + (dt / 2.0) * (v[i] * np.sin(theta[i]) + v[i+1] * np.sin(theta[i+1]))
+    
+    trajectory = np.column_stack((x, y))
+    
+    return trajectory
+
 # https://huggingface.co/docs/trl/en/dataset_formats
 def preprocess_data(examples):
     all_prompts = []
@@ -382,6 +413,52 @@ def preprocess_data(examples):
             ])
             all_completions.append([
                 {"role": "assistant", "content": f"Future Waypoints: {future_wp}."}
+            ])
+            
+    return {
+        "prompt": all_prompts,
+        "completion": all_completions
+    }
+
+def preprocess_data_action(examples):
+    all_prompts = []
+    all_completions = []
+    system_prompt = (
+        "You are an expert autonomous driving planning module (Driver). Your goal is to output a safe, smooth, and kinematically feasible future trajectory.\n"
+        "Rules:\n"
+        "1. Coordinate System: Current ego position is (0,0). X-axis positive is forward, Y-axis positive is left.\n"
+        "2. Trajectory Timing: Output exactly 12 waypoints (except origin (0,0)) representing the next 6 seconds (sampled at 2Hz, 0.5s intervals).\n"
+        "3. Kinematic Constraints: Ensure the gaps between waypoints are consistent with the current velocity and acceleration. Avoid sudden jumps or unrealistic lateral shifts.\n"
+        "4. Safety Alignment: The trajectory must strictly follow the Navigator's safety analysis.\n"
+    )
+    
+    for i in range(len(examples['token'])):
+        ego_status_prompt = (
+            f"Current Dynamics:\n"
+            f"- Velocity: {examples['vel_val'][i]:.2f} m/s\n"
+            f"- Yaw Rate: {examples['yr_val'][i]:.2f} rad/s\n"
+            f"- Acceleration (Longitudinal x, Lateral y): {examples['acc_val'][i]}\n"
+            f"- Past Trajectory (2Hz): {examples['wp_past'][i]}\n"
+            # f"- High-level Command: {examples['command'][i]}\n\n"
+        )
+        driver_user_prompt = (
+            "Predict the next 11 control actions (acceleration, curvature): (a1, k1), (a2, k2), ..., (a11, k11). "
+        )        
+        reasons_list = examples['reasons'][i]
+        action_future = examples['action_future'][i]
+        
+        for reason_text in reasons_list:
+            full_driver_prompt = (
+                f"Navigator's Analysis and Instructions:\n{reason_text}\n\n"
+                f"{ego_status_prompt}\n"
+                f"{driver_user_prompt}"
+            )
+            all_prompts.append([
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": full_driver_prompt}
+            ])
+            all_completions.append([
+                {"role": "assistant", "content": f"Future Actions: {action_future}."}
             ])
             
     return {

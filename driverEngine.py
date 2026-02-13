@@ -20,7 +20,7 @@ from datasets import load_dataset
 from trl import SFTTrainer, SFTConfig
 from nuscenes.nuscenes import NuScenes
 
-from utils.data_utils import preprocess_data, load_config
+from utils.data_utils import preprocess_data, preprocess_data_action, load_config, compute_trajectory_2
 from utils.caption_utils import reason_generate, parse_waypoints
 from utils.results_utils import calculate_metrics, format_results, render_frame
 
@@ -134,7 +134,7 @@ class driverEngine():
         print("Loading dataset from:", self.train_data_path)
         raw_dataset = load_dataset("json", data_files=self.train_data_path, split="train")
         self.train_dataset = raw_dataset.map(
-            preprocess_data,
+            preprocess_data_action,
             batched=True,
             remove_columns=raw_dataset.column_names
         )
@@ -233,7 +233,7 @@ class driverEngine():
             trust_remote_code=True
         )
                 
-    def inference(self, inference_path=None):
+    def inference(self, inference_path=None, action = True):
         output_dir = os.path.join("results/inference", f"{self.name}_{self.date_str}.jsonl")
         os.makedirs(os.path.dirname(output_dir), exist_ok=True)
         with open(inference_path or self.mini_data_path, 'r', encoding='utf-8') as f_in, \
@@ -269,14 +269,34 @@ class driverEngine():
                     max_new_tokens=128
                 )     
                 
-                pred_pts = parse_waypoints(output)
                 gt_pts = parse_waypoints(data['wp_future'])
-                
+                if not action:
+                    pred_pts = parse_waypoints(output)
+                else:
+                    pred_actions = parse_waypoints(output) # numpy array
+                    wp_past = parse_waypoints(data['wp_past'])
+                    curr_wp = wp_past[-1]
+                    prev_wp = wp_past[-2]
+                    dx = curr_wp[0] - prev_wp[0]
+                    dy = curr_wp[1] - prev_wp[1]
+                    theta0_est = np.arctan2(dy, dx)
+                    pred_pts = compute_trajectory_2(
+                        pred_actions, 
+                        0,
+                        0,
+                        theta0_est, 
+                        float(data['vel_val']),
+                        0.5
+                    )
+                    pred_pts = pred_pts[1:]
+                    # gt_actions = parse_waypoints(data['future_actions'])
                 # Save Record
                 record = {
                     "token": data['token'],
                     "gt_waypoints": gt_pts.tolist(),
-                    "pred_waypoints": pred_pts.tolist(),
+                    "pred_waypoints": np.round(pred_pts, 2).tolist(),
+                    "pred_actions": pred_actions.tolist() if action else None,
+                    # "gt_actions": gt_actions.tolist() if action else None,
                     "reasons": data['reasons'],
                 }
                 f_out.write(json.dumps(record) + "\n")

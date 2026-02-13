@@ -16,16 +16,31 @@ wget https://github.com/Dao-AILab/flash-attention/releases/download/v2.8.3/flash
 
 pip install flash_attn-2.8.3+cu12torch2.5cxx11abiFALSE-cp310-cp310-linux_x86_64.whl
 ```
+# Dataset
+```json
+{
+  "token": ["token"],
+  "wp_past": "(x, y, \theta) x t_p",
+  "wp_future": "(x, y, \theta) x t_f",
+  "vel_val": current_vel,
+  "acc_val": [a_x, a_y],
+  "yr_val": current_yaw,
+  "action_past": "(a, \kappa) x (t_p - 1)",
+  "action_future": "(a, \kappa) x t_f",
+  "image_paths": ["str x 6"],
+  "reasons": ["str x 1"]
+}
+```
 # Train
 ```
 python3 train.py --config configs/qwen_vl_2B_sft.yaml 
 ```
 # Inference
 ```
-python3 eval.py --config configs/qwen_vl_2B_sft.yaml --ckpt_path checkpoints/qwen_vl_2B_sft --inference_path data/nusscenes_reasons_mini_0203.jsonl
+python3 eval.py --config configs/qwen_vl_2B_sft.yaml --ckpt_path checkpoints/qwen_vl_2B_sft --inference_path data/nuscenes_reasons_mini_0203.jsonl
 ```
 ```
-python3 eval.py --config configs/qwen_vl_2B_sft.yaml --ckpt_path checkpoints/qwen_vl_2B_sft --inference_path data/nusscenes_reasons_val.jsonl
+python3 eval.py --config configs/qwen_vl_2B_sft.yaml --ckpt_path checkpoints/qwen_vl_2B_sft --inference_path data/nuscenes_reasons_val.jsonl
 ```
 # Evaluation
 ```

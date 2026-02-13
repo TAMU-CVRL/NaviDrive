@@ -16,7 +16,7 @@ echo "=================================================="
 python3 eval.py \
     --config configs/qwen_1_7B_sft.yaml \
     --ckpt_path checkpoints/qwen3-1.7b-dllm-sft-0203 \
-    --inference_path data/nusscenes_reasons_val_0207.jsonl
+    --inference_path data/nuscenes_reasons_val_0207.jsonl
 
 echo ""
 echo "=================================================="

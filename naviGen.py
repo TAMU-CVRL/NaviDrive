@@ -1,14 +1,10 @@
-import os
 import json
-from sympy import content
 import torch
-import numpy as np
 from PIL import Image
 from pathlib import Path
 from tqdm import tqdm
 from transformers import AutoProcessor, AutoModelForImageTextToText
 
-from utils.img_utils import resize_long_edge
 from utils.caption_utils import reason_generate
 from utils.data_utils import compute_action
 from nuscenes.nuscenes import NuScenes
@@ -54,7 +50,8 @@ def reasonGen(model_id, data_path, output_file, version, system_prompt, is_train
                     pil_images.append(img_pil)
 
                 # pts = pre_waypoints.cpu().numpy().tolist()
-                wp_past = ", ".join([f"({pt[0]:.2f}, {pt[1]:.2f})" for pt in pre_waypoints])
+                # wp_past = ", ".join([f"({pt[0]:.2f}, {pt[1]:.2f})" for pt in pre_waypoints])
+                wp_past = ", ".join([f"({pt[0]:.2f}, {pt[1]:.2f}, {pt[2]:.2f})" for pt in pre_waypoints]) # x, y, heading
                 vel_val = round(velocity[-1].item(), 2)
                 acc_val = [round(float(a), 2) for a in acceleration[-1]]
                 yr_val = round(yaw_rate[-1].item(), 2)
@@ -89,7 +86,7 @@ def reasonGen(model_id, data_path, output_file, version, system_prompt, is_train
                     )
                     reasons.append(res.strip())
                 
-                wp_future = ", ".join([f"({pt[0]:.2f}, {pt[1]:.2f})" for pt in future_waypoints])
+                wp_future = ", ".join([f"({pt[0]:.2f}, {pt[1]:.2f}, {pt[2]:.2f})" for pt in future_waypoints]) # x, y, heading
                 
                 # calculate actions
                 dt = 0.5 # 2Hz
@@ -124,21 +121,20 @@ def reasonGen(model_id, data_path, output_file, version, system_prompt, is_train
 if __name__ == "__main__":
     model_id = "Qwen/Qwen3-VL-8B-Instruct"
     data_path = Path("/home/ximeng/Dataset/nuscenes_full_v1_0/")
-    output_file = "data/nusscenes_reasons_val.jsonl"
-    # output_file = "data/nusscenes_reasons_mini.jsonl"
+    output_file = "data/nuscenes_reasons_mini.jsonl"
+    # output_file = "data/nuscenes_reasons_mini.jsonl"
     system_prompt = (
         "You are an expert autonomous driving navigator. Your task is to analyze a 360-degree surround-view driving environment and provide concise, safety-oriented driving guidance.\n"
         "Guidelines:\n"
         "1. Coordinate System: The x-axis positive is forward, the y-axis positive is left.\n"
-        "2. Attention Priority: Focus on 'Dynamic Hazards' (pedestrians, moving vehicles) and 'Traffic Regulators' (lights, signs, lane markings).\n"
-        "3. Camera Emphasis: Focus primarily on information from the front-side cameras.\n"
-        "4. Output Format: Start with a concise 'Perception' summary, followed by 'Action', and a brief 'Reasoning'."
+        "2. Attention Priority: Focus on 'Dynamic Hazards' (pedestrians, moving vehicles) and 'Traffic Regulators' (lights, signs, lane markings) on the front cameras.\n"
+        "3. Output Format: Start with a concise 'Perception' summary, followed by 'Action', and a brief 'Reasoning'. Do not use '*' in the response."
     )
     reasonGen(model_id=model_id, 
               data_path=data_path, 
               output_file=output_file, 
-              version='v1.0-trainval', # 'v1.0-mini' or 'v1.0-trainval'
+              version='v1.0-mini', # 'v1.0-mini' or 'v1.0-trainval'
               system_prompt=system_prompt, 
               num_reasons=1, 
-              is_train=1 # 0 train, 1 val
+              is_train=0 # 0 train, 1 val
     )
