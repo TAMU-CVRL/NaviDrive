@@ -4,6 +4,8 @@ from tqdm import tqdm
 from PIL import Image
 import numpy as np
 from pathlib import Path
+from scipy.sparse import diags
+from scipy.linalg import solve
 from nuscenes.utils.geometry_utils import view_points
 import yaml
 
@@ -250,17 +252,90 @@ def camera_box_to_lidar(x, y, z, h, w, l, ry, Tr_velo_to_cam, R0_rect):
     
     return lidar_center[0], lidar_center[1], lidar_center[2], h, w, l, yaw_lidar
 
-def lsm_tikhonov(output, step, lambda_reg=0.1):
-    # Tikhonov regularization
-    n = len(step)
-    A = np.eye(n)*step
-    b = output
+def lsm_tikhonov(x, y, theta, v0, a0, dt, lambda_reg=0.1):
+    n = len(x)
+    num_vars = n - 1  # acceleration steps
     
-    Gamma = np.eye(n) # Identity regularization matrix
+    # v_{i+1} = v_i + a_i * dt
+    # v_target = sqrt((dx/dt)^2 + (dy/dt)^2)
+    v_gt = np.sqrt((np.diff(x)/dt)**2 + (np.diff(y)/dt)**2) # length n-1
     
-    u = np.linalg.inv(A.T @ A + lambda_reg * Gamma) @ A.T @ b
+    # v_k = v0 + dt * sum_{j=0}^{k-1} a_j
+    # A * a = v_gt - v0
+    A = np.tril(np.ones((num_vars, num_vars))) * dt
+    target = v_gt - v0
     
-    return u
+    # A_sub * a_unknown = target - A[:, 0]*a0
+    A_sub = A[:, 1:]
+    target_sub = target - A[:, 0] * a0
+    
+    # Tikhonov Matrix D (penalizes change in acceleration: jerk)
+    num_unknowns = num_vars - 1
+    D = np.zeros((num_unknowns, num_unknowns))
+    for i in range(num_unknowns - 1):
+        D[i, i] = -1
+        D[i, i+1] = 1
+        
+    # (A.T @ A + lambda * D.T @ D) a = A.T @ target
+    # a[0] = a0
+    lhs = A_sub.T @ A_sub + lambda_reg * D.T @ D
+    rhs = A_sub.T @ target_sub
+    a_unknown = solve(lhs, rhs)
+    accel = np.concatenate(([a0], a_unknown))
+    
+    # Reconstruct smooth velocity
+    v_smooth = np.zeros(n)
+    v_smooth[0] = v0 # initial velocity
+    for i in range(num_vars):
+        v_smooth[i+1] = v_smooth[i] + accel[i] * dt
+
+    # curvature (kappa)
+    # theta_{i+1} = theta_i + dt*k*v + (dt^2/2)*k*a
+    # theta_{i+1} - theta_i = kappa_i * (dt * v_i + 0.5 * dt^2 * a_i)
+    d_theta = np.diff(theta)
+    denom = (v_smooth[:-1] * dt + 0.5 * accel * dt**2)
+    
+    # Tikhonov for kappa (penalizes steering rate)
+    # (diag(coeff)^2 + lambda * D.T @ D) kappa = diag(coeff) @ d_theta
+    W = np.diag(denom)
+    lhs_k = W.T @ W + lambda_reg * D.T @ D
+    rhs_k = W.T @ d_theta
+    kappa = solve(lhs_k, rhs_k)
+
+    return accel, kappa, v_smooth
+
+def compute_action(waypoints, dt, v0, a0) -> str:
+    waypoints = waypoints.cpu().numpy()
+    x_seq = waypoints[:, 0]
+    y_seq = waypoints[:, 1]
+    theta_seq = waypoints[:, 2]
+    accel_seq, kappa_seq, v_smooth = lsm_tikhonov(x_seq, y_seq, theta_seq, v0, a0, dt)
+    action_list = [f"({a:.4f}, {k:.4f})" for a, k in zip(accel_seq, kappa_seq)]
+    action = ", ".join(action_list)
+    return action
+
+def compute_trajectory(accel, kappa, x0, y0, theta0, v0, dt):
+    n = len(accel) + 1
+    
+    x = np.zeros(n)
+    y = np.zeros(n)
+    theta = np.zeros(n)
+    v = np.zeros(n)
+    
+    x[0], y[0], theta[0], v[0] = x0, y0, theta0, v0
+    
+    for i in range(len(accel)):
+        # update velocity v
+        v[i+1] = v[i] + accel[i] * dt
+        
+        # theta^{i+1} = theta^i + dt * k^i * v^i + (dt^2 / 2) * k^i * a^i
+        theta[i+1] = theta[i] + dt * kappa[i] * v[i] + (0.5 * dt**2) * kappa[i] * accel[i]
+        
+        # x^{i+1} = x^i + (dt/2) * (v^i*cos(theta^i) + v^{i+1}*cos(theta^{i+1}))
+        x[i+1] = x[i] + (dt / 2.0) * (v[i] * np.cos(theta[i]) + v[i+1] * np.cos(theta[i+1]))
+        y[i+1] = y[i] + (dt / 2.0) * (v[i] * np.sin(theta[i]) + v[i+1] * np.sin(theta[i+1]))
+        
+    return x, y, theta, v
 
 # https://huggingface.co/docs/trl/en/dataset_formats
 def preprocess_data(examples):
