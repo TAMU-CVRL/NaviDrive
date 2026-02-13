@@ -1,0 +1,41 @@
+Name: default
+
+Model:
+  model_id: Qwen/Qwen3-VL-2B-Instruct
+  attention: "flash_attention_2"
+  Quantization:
+    enable_quantization: False
+    load_in_8bit: True # True for 8bit, False for 4bit
+
+Dataset:
+  nuscenes_dataroot: "/home/ximeng/Dataset/nuscenes_full_v1_0/"
+  train_data_path: "data/nusscenes_reasons_v2.jsonl"
+  mini_data_path: "results/driver_predicted_waypoints_3.jsonl"
+  system_prompt: |
+      You are an expert autonomous driving planning module (Driver). Your goal is to output a safe, smooth, and kinematically feasible future trajectory.
+      Rules:
+      1. Coordinate System: Current ego position is (0,0). X-axis positive is forward, Y-axis positive is left.
+      2. Trajectory Timing: Output exactly 12 waypoints (except origin (0,0)) representing the next 6 seconds (sampled at 2Hz, 0.5s intervals).
+      3. Kinematic Constraints: Ensure the gaps between waypoints are consistent with the current velocity and acceleration. Avoid sudden jumps or unrealistic lateral shifts.
+      4. Safety Alignment: The trajectory must strictly follow the Navigator's safety analysis.
+      5. Output Format: Only output the coordinates: (x1, y1), (x2, y2), ..., (x12, y12).
+  driver_user_prompt: "Predict the next 12 waypoints."
+
+Train:
+  epochs: 3
+  batch_size: 1
+  gradient_accumulation_steps: 16
+  learning_rate: 2.0e-5
+  lr_scheduler_type: "cosine"
+  optimizer: "adamw_torch"
+  weight_decay: 0.01
+  log_to: "wandb"
+  max_length: 1024
+  LoRA:
+    lora_rank: 8
+    lora_alpha: 16
+    lora_dropout: 0.05
+    
+Eval:
+  threshold: 2.0
+  video_fps: 2
