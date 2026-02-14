@@ -132,7 +132,11 @@ if __name__ == "__main__":
     num_reasons = args.num_reasons
     version = args.version
     is_train = args.is_train
-    
+    if is_train == 0:
+        print(f"Generating training data..., is_train: {is_train}")
+    elif is_train == 1:
+        print(f"Generating evaluation data..., is_train: {is_train}")
+        
     data_path = Path("/home/ximeng/Dataset/nuscenes_full_v1_0/")
     # output_file = "data/nuscenes_reasons_mini.jsonl"
     system_prompt = (
