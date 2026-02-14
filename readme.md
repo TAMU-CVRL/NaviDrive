@@ -17,16 +17,19 @@ wget https://github.com/Dao-AILab/flash-attention/releases/download/v2.8.3/flash
 pip install flash_attn-2.8.3+cu12torch2.5cxx11abiFALSE-cp310-cp310-linux_x86_64.whl
 ```
 # Dataset
+```
+python3
+```
 ```json
 {
   "token": ["token"],
   "wp_past": "(x, y, \theta) x t_p",
   "wp_future": "(x, y, \theta) x t_f",
-  "vel_val": current_vel,
-  "acc_val": [a_x, a_y],
-  "yr_val": current_yaw,
-  "action_past": "(a, \kappa) x (t_p - 1)",
-  "action_future": "(a, \kappa) x t_f",
+  "vel_val": "<float: current_vel>",
+  "acc_val": ["<float: a_x>", "<float: a_y>"],
+  "yr_val": "<float: current_yaw>",
+  "action_past": "(a, kappa) x (t_p - 1)",
+  "action_future": "(a, kappa) x t_f",
   "image_paths": ["str x 6"],
   "reasons": ["str x 1"]
 }

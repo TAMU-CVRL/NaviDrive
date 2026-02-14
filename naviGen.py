@@ -1,5 +1,6 @@
 import json
 import torch
+import argparse
 from PIL import Image
 from pathlib import Path
 from tqdm import tqdm
@@ -119,9 +120,20 @@ def reasonGen(model_id, data_path, output_file, version, system_prompt, is_train
     print(f"\nDone! Results saved to {output_file}")
 
 if __name__ == "__main__":
-    model_id = "Qwen/Qwen3-VL-8B-Instruct"
+    parser = argparse.ArgumentParser(description="Train a samll-size driver LLM")
+    parser.add_argument("--model_id", type=str, default="Qwen/Qwen3-VL-8B-Instruct", help="Path to the configuration YAML file")
+    parser.add_argument("--output_file", type=str, default="data/nuscenes_reasons_train.jsonl", help="Path to the configuration YAML file")
+    parser.add_argument("--version", type=str, default="v1.0-trainval", choices=['v1.0-mini', 'v1.0-trainval'], help="Version of NuScenes dataset")
+    parser.add_argument("--is_train", type=int, default=0, help="Whether to generate training data")
+    parser.add_argument("--num_reasons", type=int, default=1, help="Number of reasons to generate")
+    args = parser.parse_args()
+    model_id = args.model_id
+    output_file = args.output_file
+    num_reasons = args.num_reasons
+    version = args.version
+    is_train = args.is_train
+    
     data_path = Path("/home/ximeng/Dataset/nuscenes_full_v1_0/")
-    output_file = "data/nuscenes_reasons_mini.jsonl"
     # output_file = "data/nuscenes_reasons_mini.jsonl"
     system_prompt = (
         "You are an expert autonomous driving navigator. Your task is to analyze a 360-degree surround-view driving environment and provide concise, safety-oriented driving guidance.\n"
@@ -133,8 +145,8 @@ if __name__ == "__main__":
     reasonGen(model_id=model_id, 
               data_path=data_path, 
               output_file=output_file, 
-              version='v1.0-mini', # 'v1.0-mini' or 'v1.0-trainval'
+              version=version, # 'v1.0-mini' or 'v1.0-trainval'
               system_prompt=system_prompt, 
-              num_reasons=1, 
-              is_train=0 # 0 train, 1 val
+              num_reasons=num_reasons, 
+              is_train=is_train # 0 train, 1 val
     )

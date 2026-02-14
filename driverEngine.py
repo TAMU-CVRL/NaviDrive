@@ -134,7 +134,7 @@ class driverEngine():
         print("Loading dataset from:", self.train_data_path)
         raw_dataset = load_dataset("json", data_files=self.train_data_path, split="train")
         self.train_dataset = raw_dataset.map(
-            preprocess_data_action,
+            preprocess_data_action, # TODO: support for waypoints and controls
             batched=True,
             remove_columns=raw_dataset.column_names
         )
@@ -234,6 +234,7 @@ class driverEngine():
         )
                 
     def inference(self, inference_path=None, action = True):
+        # TODO: support for waypoints and controls
         output_dir = os.path.join("results/inference", f"{self.name}_{self.date_str}.jsonl")
         os.makedirs(os.path.dirname(output_dir), exist_ok=True)
         with open(inference_path or self.mini_data_path, 'r', encoding='utf-8') as f_in, \
