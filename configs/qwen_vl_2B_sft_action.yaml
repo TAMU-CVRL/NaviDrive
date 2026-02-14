@@ -35,6 +35,7 @@ Train:
     lora_rank: 8
     lora_alpha: 16
     lora_dropout: 0.05
+  enable_action: True
     
 Eval:
   threshold: 2.0

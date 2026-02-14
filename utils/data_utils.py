@@ -8,6 +8,7 @@ from scipy.sparse import diags
 from scipy.linalg import solve
 from nuscenes.utils.geometry_utils import view_points
 import yaml
+import re
 
 def save_triplet_dataset_jsonl(dataset, save_jsonl_path, split, rel_image_dir, rel_lidar_dir, image_format='png', lidar_format='npy'):
     # 1. Anchor the absolute path relative to where the JSONL is stored
@@ -373,33 +374,25 @@ def compute_trajectory_2(pred_actions, x0, y0, theta0, v0, dt) -> np.ndarray:
     return trajectory
 
 # https://huggingface.co/docs/trl/en/dataset_formats
-def preprocess_data(examples):
+def preprocess_data(examples, driver_user_prompt, system_prompt):
     all_prompts = []
     all_completions = []
-    system_prompt = (
-        "You are an expert autonomous driving planning module (Driver). Your goal is to output a safe, smooth, and kinematically feasible future trajectory.\n"
-        "Rules:\n"
-        "1. Coordinate System: Current ego position is (0,0). X-axis positive is forward, Y-axis positive is left.\n"
-        "2. Trajectory Timing: Output exactly 12 waypoints (except origin (0,0)) representing the next 6 seconds (sampled at 2Hz, 0.5s intervals).\n"
-        "3. Kinematic Constraints: Ensure the gaps between waypoints are consistent with the current velocity and acceleration. Avoid sudden jumps or unrealistic lateral shifts.\n"
-        "4. Safety Alignment: The trajectory must strictly follow the Navigator's safety analysis.\n"
-        "5. Output Format: Only output the coordinates: (x1, y1), (x2, y2), ..., (x12, y12)."
-    )
     
     for i in range(len(examples['token'])):
+        # only keep x,y for the prompt, remove theta if exists
+        wp_past = filter_to_xy_str(examples['wp_past'][i])
+        wp_future = filter_to_xy_str(examples['wp_future'][i])
+        
         ego_status_prompt = (
             f"Current Dynamics:\n"
             f"- Velocity: {examples['vel_val'][i]:.2f} m/s\n"
             f"- Yaw Rate: {examples['yr_val'][i]:.2f} rad/s\n"
             f"- Acceleration (Longitudinal x, Lateral y): {examples['acc_val'][i]}\n"
-            f"- Past Trajectory (2Hz): {examples['wp_past'][i]}\n"
+            f"- Past Trajectory (2Hz): {wp_past}\n"
             # f"- High-level Command: {examples['command'][i]}\n\n"
         )
-        driver_user_prompt = (
-            "Predict the next 12 waypoints. "
-        )        
+            
         reasons_list = examples['reasons'][i]
-        future_wp = examples['wp_future'][i]
         
         for reason_text in reasons_list:
             full_driver_prompt = (
@@ -412,7 +405,7 @@ def preprocess_data(examples):
                 {"role": "user", "content": full_driver_prompt}
             ])
             all_completions.append([
-                {"role": "assistant", "content": f"Future Waypoints: {future_wp}."}
+                {"role": "assistant", "content": f"{wp_future}."}
             ])
             
     return {
@@ -469,3 +462,18 @@ def preprocess_data_action(examples):
 def load_config(config_path="config.yaml"):
     with open(config_path, "r") as f:
         return yaml.safe_load(f)
+    
+def filter_to_xy_str(original_str):
+    pattern = r"\(([^)]+)\)"
+    matches = re.findall(pattern, original_str)
+
+    new_points = []
+    for m in matches:
+        parts = [p.strip() for p in m.split(',')]
+        
+        if len(parts) > 2:
+            new_points.append(f"({parts[0]}, {parts[1]})")
+        else:
+            new_points.append(f"({m})")
+            
+    return ", ".join(new_points)

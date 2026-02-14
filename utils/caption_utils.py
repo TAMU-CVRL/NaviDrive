@@ -221,10 +221,16 @@ def parse_waypoints(vlm_str):
     pattern = r"\((-?\d+\.?\d*),\s*(-?\d+\.?\d*)\)"
     matches = re.findall(pattern, vlm_str)
     
-    if matches:
-        waypoints = np.array(matches, dtype=float)
-        return waypoints
-    else:
-        print("Warning: No waypoints found in VLM output!")
-        return np.array([])
+    waypoints = np.array(matches, dtype=float)
+    return waypoints
     
+def parse_string(vlm_str):
+    pattern = r"\(([^)]+)\)"
+    matches = re.findall(pattern, vlm_str)
+    
+    results = []
+    for m in matches:
+        point = [float(x.strip()) for x in m.split(',')]
+        results.append(point)   
+    
+    return results

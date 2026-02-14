@@ -20,8 +20,8 @@ from datasets import load_dataset
 from trl import SFTTrainer, SFTConfig
 from nuscenes.nuscenes import NuScenes
 
-from utils.data_utils import preprocess_data, preprocess_data_action, load_config, compute_trajectory_2
-from utils.caption_utils import reason_generate, parse_waypoints
+from utils.data_utils import preprocess_data, preprocess_data_action, load_config, compute_trajectory_2, filter_to_xy_str
+from utils.caption_utils import reason_generate, parse_waypoints, parse_string
 from utils.results_utils import calculate_metrics, format_results, render_frame
 
 class driverEngine():
@@ -54,7 +54,8 @@ class driverEngine():
         self.weight_decay = self.train_cfg["weight_decay"]
         self.log_to = self.train_cfg["log_to"]
         self.max_length = self.train_cfg["max_length"]
-
+        self.enable_action = self.train_cfg.get("enable_action", False)
+        
     def init_wandb(self):
         wandb.init(
             project="dllm",
@@ -134,9 +135,13 @@ class driverEngine():
         print("Loading dataset from:", self.train_data_path)
         raw_dataset = load_dataset("json", data_files=self.train_data_path, split="train")
         self.train_dataset = raw_dataset.map(
-            preprocess_data_action, # TODO: support for waypoints and controls
+            preprocess_data, # TODO: support for waypoints and controls
             batched=True,
-            remove_columns=raw_dataset.column_names
+            remove_columns=raw_dataset.column_names,
+            fn_kwargs={
+                "driver_user_prompt": self.driver_user_prompt,
+                "system_prompt": self.system_prompt
+            },
         )
         print(f"Dataset expanded: {len(raw_dataset)} -> {len(self.train_dataset)} samples.")
     
@@ -233,7 +238,7 @@ class driverEngine():
             trust_remote_code=True
         )
                 
-    def inference(self, inference_path=None, action = True):
+    def inference(self, inference_path=None):
         # TODO: support for waypoints and controls
         output_dir = os.path.join("results/inference", f"{self.name}_{self.date_str}.jsonl")
         os.makedirs(os.path.dirname(output_dir), exist_ok=True)
@@ -242,13 +247,14 @@ class driverEngine():
             lines = f_in.readlines()
             for line in tqdm(lines, desc="Inference"):
                 data = json.loads(line)
-                
+                xy_past = filter_to_xy_str(data['wp_past'])   
+                 
                 ego_status_prompt = (
                     "Current Dynamics:\n"
                     f"- Velocity: {data['vel_val']} m/s.\n"
                     f"- Yaw Rate: {data['yr_val']} rad/s.\n"
                     f"- Acceleration (Longitudinal x, Lateral y): {data['acc_val']} m/s^2.\n"
-                    f"- Past Trajectory (2Hz): {data['wp_past']} m.\n\n"
+                    f"- Past Trajectory (2Hz): {xy_past} m.\n\n"
                     # f"- High-level Command: {data['command']}\n"
                 )
                 
@@ -270,34 +276,28 @@ class driverEngine():
                     max_new_tokens=128
                 )     
                 
-                gt_pts = parse_waypoints(data['wp_future'])
-                if not action:
-                    pred_pts = parse_waypoints(output)
+                gt_pts = parse_string(data['wp_future'])
+                gt_pts = gt_pts[:, :2] # (x, y)
+                if not self.enable_action:
+                    # only predict waypoints without action prediction
+                    pred_pts = parse_string(output)
+                    pred_pts = pred_pts[:, :2] # (x, y)
                 else:
-                    pred_actions = parse_waypoints(output) # numpy array
-                    wp_past = parse_waypoints(data['wp_past'])
-                    curr_wp = wp_past[-1]
-                    prev_wp = wp_past[-2]
-                    dx = curr_wp[0] - prev_wp[0]
-                    dy = curr_wp[1] - prev_wp[1]
-                    theta0_est = np.arctan2(dy, dx)
-                    pred_pts = compute_trajectory_2(
-                        pred_actions, 
-                        0,
-                        0,
-                        theta0_est, 
-                        float(data['vel_val']),
-                        0.5
-                    )
-                    pred_pts = pred_pts[1:]
-                    # gt_actions = parse_waypoints(data['future_actions'])
+                    # predict actions, then compute waypoints from predicted actions
+                    pred_actions = parse_string(output) # numpy array
+                    wp_past = parse_string(data['wp_past'])
+                    theta0 = wp_past[-1, 2] # yaw angle
+                    pred_pts = compute_trajectory_2(pred_actions, 0, 0, theta0, float(data['vel_val']),0.5)
+                    pred_pts = np.round(pred_pts[1:], 2) # remove the first point
+                    gt_actions = parse_string(data['action_future'])
+                
                 # Save Record
                 record = {
                     "token": data['token'],
                     "gt_waypoints": gt_pts.tolist(),
-                    "pred_waypoints": np.round(pred_pts, 2).tolist(),
-                    "pred_actions": pred_actions.tolist() if action else None,
-                    # "gt_actions": gt_actions.tolist() if action else None,
+                    "pred_waypoints": pred_pts.tolist(),
+                    "gt_actions": gt_actions.tolist() if self.enable_action else None,
+                    "pred_actions": pred_actions.tolist() if self.enable_action else None,
                     "reasons": data['reasons'],
                 }
                 f_out.write(json.dumps(record) + "\n")
