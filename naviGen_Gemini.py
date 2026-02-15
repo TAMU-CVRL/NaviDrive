@@ -40,7 +40,7 @@ def call_gemini_api(model_id, contents, config):
         config=config
     )
     
-def process_single_sample(sample, system_prompt, model_id, num_reasons):
+def process_single_sample(sample, data_path, system_prompt, model_id, num_reasons):
     try:
         token = sample['token']
         pre_waypoints = sample['pre_waypoints']
@@ -55,8 +55,8 @@ def process_single_sample(sample, system_prompt, model_id, num_reasons):
         
         pil_images = []
         for idx in new_order:
-            img_path = image_paths[idx]
-            with Image.open(img_path) as img:
+            full_path = data_path / image_paths[idx]
+            with Image.open(full_path) as img:
                 img.thumbnail((1024, 1024))
                 pil_images.append(img.copy())
 
@@ -148,7 +148,7 @@ def reasonGen_Gemini(model_id, data_path, output_file, version, system_prompt, i
     with open(output_file, 'a', encoding='utf-8') as f:
         with ThreadPoolExecutor(max_workers=max_workers) as executor:
             future_to_idx = {
-                executor.submit(process_single_sample, dataset[i], system_prompt, model_id, num_reasons): i 
+                executor.submit(process_single_sample, dataset[i], data_path, system_prompt, model_id, num_reasons): i 
                 for i in indices
             }
         for future in tqdm(as_completed(future_to_idx), total=len(indices), desc="Inference"):
