@@ -2,33 +2,8 @@ import torch
 import numpy as np
 from nuscenes.utils.geometry_utils import view_points
 from pyquaternion import Quaternion
-from open3d import open3d as o3d
 from sklearn.neighbors import NearestNeighbors
 import math
-
-def segment_ground_o3d(points, dist_thresh=0.15, ransac_n=3, num_iterations=1000):
-    # Convert to numpy
-    if isinstance(points, torch.Tensor):
-        points = points.detach().cpu().numpy()
-    if points.shape[1] > 3:
-        points = points[:, :3]
-
-    # Convert to open3d point cloud
-    pcd = o3d.geometry.PointCloud()
-    pcd.points = o3d.utility.Vector3dVector(points)
-
-    # RANSAC
-    plane_model, inliers = pcd.segment_plane(distance_threshold=dist_thresh,
-                                             ransac_n=ransac_n,
-                                             num_iterations=num_iterations)
-    [a, b, c, d] = plane_model
-    # print(f"[INFO] Plane equation: {a:.2f}x + {b:.2f}y + {c:.2f}z + {d:.2f} = 0")
-
-    ground_points = points[inliers]
-    non_ground_points = np.delete(points, inliers, axis=0)
-
-    # print(f"[INFO] Ground points: {len(ground_points)}, Non-ground points: {len(non_ground_points)}")
-    return ground_points, non_ground_points
 
 def lidar2camera_fov(nusc, points_lidar, token, camera_name):
     # Get sample and sensors

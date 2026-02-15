@@ -11,7 +11,7 @@ from utils.data_utils import compute_action
 from nuscenes.nuscenes import NuScenes
 from data.nuscenes_data import NuscenesData
 
-def reasonGen(model_id, data_path, output_file, version, system_prompt, is_train = 0, pre_frame = 4, future_frame = 12, num_reasons = 3, device = "auto"):
+def reasonGen(model_id, data_path, output_file, version, system_prompt, is_train = 0, pre_frame = 4, future_frame = 12, num_reasons = 3, device = "auto", total_shards = 1, shard_id = 0):
     print(f"Loading model: {model_id}...")
     processor = AutoProcessor.from_pretrained(
         model_id, 
@@ -23,11 +23,15 @@ def reasonGen(model_id, data_path, output_file, version, system_prompt, is_train
     print("Loading NuScenes dataset...")
     nusc = NuScenes(version=version, dataroot=data_path)
     dataset = NuscenesData(nusc, is_train, pre_frame, future_frame)
-
-    print(f"Starting inference on {len(dataset)} samples...")
+    total_samples = len(dataset)
+    shard_size = total_samples // total_shards
+    start_idx = shard_id * shard_size    
+    end_idx = total_samples if shard_id == total_shards - 1 else (shard_id + 1) * shard_size
+    indices = range(start_idx, end_idx)
+    print(f"Shard {shard_id}/{total_shards}: Processing samples from {start_idx} to {end_idx}...")
     
     with open(output_file, 'a', encoding='utf-8') as f:
-        for i in tqdm(range(len(dataset))):
+        for i in tqdm(indices):
             try:
                 sample = dataset[i]
                 token = sample['token']
@@ -123,21 +127,28 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Train a samll-size driver LLM")
     parser.add_argument("--model_id", type=str, default="Qwen/Qwen3-VL-8B-Instruct", help="Path to the configuration YAML file")
     parser.add_argument("--output_file", type=str, default="data/nuscenes_reasons_train.jsonl", help="Path to the configuration YAML file")
+    parser.add_argument("--data_path", type=str, default="/home/ximeng/Dataset/nuscenes_full_v1_0/", help="Path to the NuScenes dataset")
     parser.add_argument("--version", type=str, default="v1.0-trainval", choices=['v1.0-mini', 'v1.0-trainval'], help="Version of NuScenes dataset")
     parser.add_argument("--is_train", type=int, default=0, help="Whether to generate training data")
     parser.add_argument("--num_reasons", type=int, default=1, help="Number of reasons to generate")
+    parser.add_argument("--total_shards", type=int, default=1, help="Total number of shards")
+    parser.add_argument("--shard_id", type=int, default=0, help="Current shard index (0 to total_shards-1)")
+    
     args = parser.parse_args()
     model_id = args.model_id
     output_file = args.output_file
     num_reasons = args.num_reasons
     version = args.version
     is_train = args.is_train
+    total_shards = args.total_shards
+    shard_id = args.shard_id
+    
     if is_train == 0:
         print(f"Generating training data..., is_train: {is_train}")
     elif is_train == 1:
         print(f"Generating evaluation data..., is_train: {is_train}")
         
-    data_path = Path("/home/ximeng/Dataset/nuscenes_full_v1_0/")
+    data_path = Path(args.data_path)
     # output_file = "data/nuscenes_reasons_mini.jsonl"
     system_prompt = (
         "You are an expert autonomous driving navigator. Your task is to analyze a 360-degree surround-view driving environment and provide concise, safety-oriented driving guidance.\n"
@@ -152,5 +163,7 @@ if __name__ == "__main__":
               version=version, # 'v1.0-mini' or 'v1.0-trainval'
               system_prompt=system_prompt, 
               num_reasons=num_reasons, 
-              is_train=is_train # 0 train, 1 val
+              is_train=is_train, # 0 train, 1 val
+              total_shards=total_shards,
+              shard_id=shard_id
     )
