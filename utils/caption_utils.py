@@ -233,4 +233,5 @@ def parse_string(vlm_str):
         point = [float(x.strip()) for x in m.split(',')]
         results.append(point)   
     
+    results = np.array(results)
     return results

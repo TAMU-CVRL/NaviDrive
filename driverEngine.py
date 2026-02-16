@@ -140,7 +140,8 @@ class driverEngine():
             remove_columns=raw_dataset.column_names,
             fn_kwargs={
                 "driver_user_prompt": self.driver_user_prompt,
-                "system_prompt": self.system_prompt
+                "system_prompt": self.system_prompt,
+                "enable_action": self.enable_action
             },
         )
         print(f"Dataset expanded: {len(raw_dataset)} -> {len(self.train_dataset)} samples.")
@@ -289,7 +290,7 @@ class driverEngine():
                     pred_actions = parse_string(output) # numpy array
                     wp_past = parse_string(data['wp_past'])
                     theta0 = wp_past[-1, 2] # yaw angle
-                    pred_pts = compute_trajectory_2(pred_actions, 0, 0, theta0, float(data['vel_val']),0.5)
+                    pred_pts = compute_trajectory_2(pred_actions, 0, 0, theta0, float(data['vel_val']), 0.5)
                     pred_pts = np.round(pred_pts[1:], 2) # remove the first point
                     gt_actions = parse_string(data['action_future'])
                 

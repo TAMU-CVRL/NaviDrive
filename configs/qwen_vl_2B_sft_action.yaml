@@ -9,7 +9,7 @@ Model:
 
 Dataset:
   nuscenes_dataroot: "/home/ximeng/Dataset/nuscenes_full_v1_0/"
-  train_data_path: "data/nuscenes_reasons_32B.jsonl"
+  train_data_path: "data/nuscenes_reasons_Qwen_32B.jsonl"
   mini_data_path: "results/driver_predicted_waypoints.jsonl"
   system_prompt: |
       You are an expert autonomous driving planning module (Driver). Your goal is to output a safe, smooth, and kinematically feasible future trajectory.
@@ -22,8 +22,8 @@ Dataset:
   driver_user_prompt: "Predict the next 11 control actions (acceleration, curvature): (a1, k1), (a2, k2), ..., (a11, k11)."
 
 Train:
-  epochs: 1
-  batch_size: 1
+  epochs: 3
+  batch_size: 2
   gradient_accumulation_steps: 16
   learning_rate: 1.0e-5
   lr_scheduler_type: "cosine"

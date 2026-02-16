@@ -374,14 +374,17 @@ def compute_trajectory_2(pred_actions, x0, y0, theta0, v0, dt) -> np.ndarray:
     return trajectory
 
 # https://huggingface.co/docs/trl/en/dataset_formats
-def preprocess_data(examples, driver_user_prompt, system_prompt):
+def preprocess_data(examples, driver_user_prompt, system_prompt, enable_action=False):
     all_prompts = []
     all_completions = []
     
     for i in range(len(examples['token'])):
         # only keep x,y for the prompt, remove theta if exists
         wp_past = filter_to_xy_str(examples['wp_past'][i])
-        wp_future = filter_to_xy_str(examples['wp_future'][i])
+        if not enable_action:
+            wp_future = filter_to_xy_str(examples['wp_future'][i])
+        else:
+            wp_future = filter_to_xy_str(examples['action_future'][i])
         
         ego_status_prompt = (
             f"Current Dynamics:\n"
