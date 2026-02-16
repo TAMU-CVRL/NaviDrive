@@ -9,7 +9,7 @@ Model:
 
 Dataset:
   nuscenes_dataroot: "/home/ximeng/Dataset/nuscenes_full_v1_0/"
-  train_data_path: "data/nuscenes_reasons_val.jsonl"
+  train_data_path: "data/nuscenes_reasons_32B.jsonl"
   mini_data_path: "results/driver_predicted_waypoints.jsonl"
   system_prompt: |
       You are an expert autonomous driving planning module (Driver). Your goal is to output a safe, smooth, and kinematically feasible future trajectory.
@@ -30,7 +30,7 @@ Train:
   optimizer: "adamw_torch"
   weight_decay: 0.01
   log_to: "wandb"
-  max_length: 1024
+  max_length: 4096
   LoRA:
     lora_rank: 8
     lora_alpha: 16

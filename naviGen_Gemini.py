@@ -2,6 +2,7 @@ import json
 import argparse
 import threading
 import time
+import os
 from pathlib import Path
 from tqdm import tqdm
 from PIL import Image
@@ -80,19 +81,17 @@ def process_single_sample(sample, data_path, system_prompt, model_id, num_reason
             "Task: Analyze the current situation and provide the safest next action with reasons."
         )
 
+        user_parts = []
+        for img in pil_images:
+                user_parts.append(img)
+        user_parts.append(types.Part(text=user_prompt_text))
         contents = [
-            types.Content(role="system", parts=[types.Part.from_text(system_prompt)]),
-            types.Content(role="user", parts=[
-                # Images Prompt
-                *[types.Part.from_image(img) for img in pil_images],
-                # Text Prompt
-                types.Part.from_text(user_prompt_text)
-            ])
+            types.Content(role="user", parts=user_parts)
         ]
-        
+
         config = types.GenerateContentConfig(
             temperature=1.0,
-            max_output_tokens=1024,
+            system_instruction=[types.Part(text=system_prompt)]
         )
 
         reasons = []
@@ -131,7 +130,7 @@ def process_single_sample(sample, data_path, system_prompt, model_id, num_reason
 def reasonGen_Gemini(model_id, data_path, output_file, version, system_prompt, is_train = 0, pre_frame = 4, 
                      future_frame = 12, num_reasons = 3, device = "auto", total_shards = 1, shard_id = 0,
                      max_workers = 4):
-
+    
     print(f"Loading NuScenes dataset ({version})...")
     nusc = NuScenes(version=version, dataroot=data_path)
     dataset = NuscenesData(nusc, is_train, pre_frame, future_frame)
@@ -140,25 +139,32 @@ def reasonGen_Gemini(model_id, data_path, output_file, version, system_prompt, i
     shard_size = total_samples // total_shards
     start_idx = shard_id * shard_size    
     end_idx = total_samples if shard_id == total_shards - 1 else (shard_id + 1) * shard_size
-    indices = range(start_idx, end_idx)
+    all_indices = list(range(start_idx, end_idx))
+    
     print(f"Shard {shard_id}/{total_shards}: Processing samples from {start_idx} to {end_idx}...")
     print(f"Target Model: {model_id} | Location: {LOCATION}")
     print(f"Concurrency: {max_workers} threads")
     
+    BATCH_SIZE = 100
+    
     with open(output_file, 'a', encoding='utf-8') as f:
-        with ThreadPoolExecutor(max_workers=max_workers) as executor:
-            future_to_idx = {
-                executor.submit(process_single_sample, dataset[i], data_path, system_prompt, model_id, num_reasons): i 
-                for i in indices
-            }
-        for future in tqdm(as_completed(future_to_idx), total=len(indices), desc="Inference"):
-            idx = future_to_idx[future]
-            result = future.result()
+        for batch_start in range(0, len(all_indices), BATCH_SIZE):
+            batch_end = min(batch_start + BATCH_SIZE, len(all_indices))
+            current_batch_indices = all_indices[batch_start:batch_end]
+            print(f"Processing Batch {batch_start} to {batch_end} ({len(current_batch_indices)} samples)...")
             
-            if result:
-                with file_lock:
-                    f.write(json.dumps(result, ensure_ascii=False) + "\n")
-                    f.flush()
+            with ThreadPoolExecutor(max_workers=max_workers) as executor:
+                futures = [
+                    executor.submit(process_single_sample, dataset[i], data_path, system_prompt, model_id, num_reasons)
+                    for i in current_batch_indices
+                ]
+                
+                for future in tqdm(futures, total=len(current_batch_indices), desc="Inference (Ordered)"):
+                    result = future.result()
+                    
+                    if result:
+                        f.write(json.dumps(result, ensure_ascii=False) + "\n")
+                        f.flush()
                     
     print(f"\nDone! Results saved to {output_file}")
 

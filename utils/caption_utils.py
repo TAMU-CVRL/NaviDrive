@@ -117,7 +117,7 @@ def scene_generate(instance_data, prompt, system, images, processor, model):
     inputs = {k: v.to(device) if torch.is_tensor(v) else v for k, v in inputs.items()}
 
     with torch.no_grad():
-        generate_ids = model.generate(**inputs, max_new_tokens=512)
+        generate_ids = model.generate(**inputs, max_new_tokens=2048)
 
     generated_ids_trimmed = [
         out_ids[len(in_ids):] for in_ids, out_ids in zip(inputs["input_ids"], generate_ids)
@@ -152,7 +152,7 @@ def scene_generate_v2(full_prompt, system, processor, model, images=None, do_sam
     inputs = {k: v.to(device) if torch.is_tensor(v) else v for k, v in inputs.items()}
 
     with torch.no_grad():
-        generate_ids = model.generate(**inputs, max_new_tokens=512, do_sample=do_sample)
+        generate_ids = model.generate(**inputs, max_new_tokens=2048, do_sample=do_sample)
 
     generated_ids_trimmed = [
         out_ids[len(in_ids):] for in_ids, out_ids in zip(inputs["input_ids"], generate_ids)
@@ -163,7 +163,7 @@ def scene_generate_v2(full_prompt, system, processor, model, images=None, do_sam
     
     return messages, caption
 
-def reason_generate(user, system, processor, model, images=None, do_sample=False, max_new_tokens=512, **kwargs):
+def reason_generate(user, system, processor, model, images=None, do_sample=False, max_new_tokens=2048, **kwargs):
     if images is None:
         images = []
 
@@ -189,7 +189,7 @@ def reason_generate(user, system, processor, model, images=None, do_sample=False
     with torch.no_grad():
         generate_ids = model.generate(
             **inputs, 
-            max_new_tokens=512, 
+            max_new_tokens=max_new_tokens, # 512
             do_sample=do_sample,
             **kwargs 
         )

@@ -181,7 +181,9 @@ class driverEngine():
             weight_decay=self.weight_decay,
             report_to=self.log_to,
             max_length=self.max_length,
-            completion_only_loss=True
+            completion_only_loss=True,
+            save_strategy="epoch",
+            save_total_limit=1
         )
         
         peft_config = self.get_lora_config() if self.enable_quant else None # When using quantization, we enable LoRA by default to allow fine-tuning
