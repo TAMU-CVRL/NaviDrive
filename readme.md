@@ -47,7 +47,7 @@ python3 eval.py --config configs/qwen_vl_2B_sft.yaml --ckpt_path checkpoints/qwe
 ```
 # Evaluation
 ```
-python3 eval.py --config configs/qwen_vl_2B_sft.yaml --ckpt_path checkpoints/qwen_vl_2B_sft --eval_path results/inference/qwen_vl_2B_sft_inference.jsonl --eval_L2 True
+d
 ```
 ```
 python3 eval.py --config configs/qwen_vl_2B_sft.yaml --ckpt_path checkpoints/qwen_vl_2B_sft --eval_path results/inference/qwen_vl_2B_sft_inference.jsonl --eval_video True

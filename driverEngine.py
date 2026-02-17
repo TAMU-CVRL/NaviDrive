@@ -168,7 +168,7 @@ class driverEngine():
         self.init_wandb()
         self.load_dataset()
         print(f"Hyperparameters:\n {self.hyper_info}")
-        output_dir = os.path.join("checkpoints", f"{self.name}_{self.date_str}")
+        output_dir = os.path.join("checkpoints", f"{self.name}")
         
         # SFTTrainer configuration
         sft_config = SFTConfig(
