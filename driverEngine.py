@@ -5,6 +5,7 @@ import numpy as np
 import cv2
 import torch
 import wandb
+import time
 
 from tqdm import tqdm
 from datetime import datetime
@@ -59,7 +60,8 @@ class driverEngine():
     def init_wandb(self):
         wandb.init(
             project="dllm",
-            name=self.name + "_" + self.date_str,
+            # name=self.name + "_" + self.date_str,
+            name=self.name,
             config={
                 "model_id": self.model_id,
                 "attention_type": self.attention_type,
@@ -168,6 +170,7 @@ class driverEngine():
         self.init_wandb()
         self.load_dataset()
         print(f"Hyperparameters:\n {self.hyper_info}")
+        # output_dir = os.path.join("checkpoints", f"{self.name}_{self.date_str}")
         output_dir = os.path.join("checkpoints", f"{self.name}")
         
         # SFTTrainer configuration
@@ -203,9 +206,12 @@ class driverEngine():
         print(f"Model saved to {output_dir}")
 
     def load_model_from_checkpoint(self, checkpoint_path):
-        if not os.path.exists(checkpoint_path):
-            print(f"Error: Checkpoint path {checkpoint_path} does not exist.")
-            return
+        if checkpoint_path is None:
+            try:
+                checkpoint_path = os.path.join("checkpoints", f"{self.name}") # automatically load latest checkpoint
+            except:
+                print("Error: Checkpoint path not found.")
+                return
 
         print(f"Loading model from checkpoint: {checkpoint_path}")
         model_id = checkpoint_path
@@ -242,12 +248,16 @@ class driverEngine():
         )
                 
     def inference(self, inference_path=None):
-        # TODO: support for waypoints and controls
-        output_dir = os.path.join("results/inference", f"{self.name}_{self.date_str}.jsonl")
+        # output_dir = os.path.join("results/inference", f"{self.name}_{self.date_str}.jsonl")
+        output_dir = os.path.join("results/inference", f"{self.name}.jsonl")
         os.makedirs(os.path.dirname(output_dir), exist_ok=True)
+        
+        overall_start = time.perf_counter()
+        model_latencies = []
         with open(inference_path or self.mini_data_path, 'r', encoding='utf-8') as f_in, \
              open(output_dir, 'w', encoding='utf-8') as f_out:
             lines = f_in.readlines()
+            num_samples = len(lines)
             for line in tqdm(lines, desc="Inference"):
                 data = json.loads(line)
                 xy_past = filter_to_xy_str(data['wp_past'])   
@@ -267,7 +277,11 @@ class driverEngine():
                     f"{ego_status_prompt}\n"
                     f"{self.driver_user_prompt}"
                 )
-                
+
+                if torch.cuda.is_available():
+                    torch.cuda.synchronize()
+                m_start = time.perf_counter()      
+                          
                 # Model Inference
                 _, output = reason_generate(
                     user=full_driver_prompt,
@@ -278,6 +292,10 @@ class driverEngine():
                     do_sample=True,
                     max_new_tokens=128
                 )     
+
+                if torch.cuda.is_available():
+                    torch.cuda.synchronize()
+                model_latencies.append(time.perf_counter() - m_start)
                 
                 gt_pts = parse_string(data['wp_future'])
                 gt_pts = gt_pts[:, :2] # (x, y)
@@ -305,6 +323,25 @@ class driverEngine():
                 }
                 f_out.write(json.dumps(record) + "\n")
                 f_out.flush()
+        
+        overall_end = time.perf_counter()
+        total_time = overall_end - overall_start
+        avg_overall_latency = total_time / num_samples
+        avg_model_latency = np.mean(model_latencies)
+
+        output_dir = "results"
+        os.makedirs(output_dir, exist_ok=True)
+        output_path = os.path.join(output_dir, f"results.txt") # save all results to 
+        hyper_info = self.hyper_info
+        
+        with open(output_path, 'a', encoding='utf-8') as f_out:
+            # f_out.write("="*100)
+            f_out.write(hyper_info)
+            f_out.write(f"Total Inference Time: {total_time:.2f} s\n")
+            f_out.write(f"Average Latency per Sample: {avg_overall_latency:.2f} s\n")
+            f_out.write(f"Average Model Inference Latency: {avg_model_latency:.2f} s\n")
+
+        print(f"Results saved to: {output_path}")
     
     def get_nusc(self, version="v1.0-trainval"):
         print("Loading NuScenes...")
@@ -314,7 +351,10 @@ class driverEngine():
     def eval_L2(self, eval_path=None):
         all_results = []
         if not eval_path:
-            eval_path = self.mini_data_path
+            try:
+                eval_path = os.path.join("results", "inference", f"{self.name}.jsonl")
+            except:
+                pass
         
         if not os.path.exists(eval_path):
             print(f"Error: {eval_path} does not exist.")
@@ -342,14 +382,14 @@ class driverEngine():
 
         output_dir = "results"
         os.makedirs(output_dir, exist_ok=True)
-        date_str = datetime.now().strftime("%Y%m%d")
-        output_path = os.path.join(output_dir, f"results_{date_str}.txt")
-        hyper_info = self.hyper_info
+        # output_path = os.path.join(output_dir, f"results_{self.date_str}.txt")
+        output_path = os.path.join(output_dir, f"results.txt") # save all results to 
+        # hyper_info = self.hyper_info
         result_text = format_results(avg_metrics, eval_path, len(all_results), self.cfg["Eval"]["threshold"])
         
         with open(output_path, 'a', encoding='utf-8') as f_out:
             # f_out.write("="*100)
-            f_out.write(hyper_info)
+            # f_out.write(hyper_info)
             f_out.write(result_text)
             f_out.write("="*100 + "\n")
 
@@ -361,8 +401,9 @@ class driverEngine():
         os.makedirs("results/videos", exist_ok=True)
         nuscenes_version = "v1.0-trainval" if eval_path else "v1.0-mini"
         nusc = self.get_nusc(version=nuscenes_version)
-        output_file = os.path.join("results/videos", f"{self.name}_{self.date_str}.mp4")
-
+        # output_file = os.path.join("results/videos", f"{self.name}_{self.date_str}.mp4")
+        output_file = os.path.join("results/videos", f"{self.name}.mp4")
+        
         with open(input_file, 'r') as f:
             lines = f.readlines() 
         
@@ -385,7 +426,8 @@ class driverEngine():
         os.makedirs("results/images", exist_ok=True)
         nuscenes_version = "v1.0-trainval" if eval_path else "v1.0-mini"
         nusc = self.get_nusc(version=nuscenes_version)
-        output_dir = os.path.join("results/images", f"{self.name}_{self.date_str}")
+        # output_dir = os.path.join("results/images", f"{self.name}_{self.date_str}")
+        output_dir = os.path.join("results/images", f"{self.name}")
         os.makedirs(output_dir, exist_ok=True)
         
         with open(input_file, 'r') as f:
@@ -436,6 +478,7 @@ class driverEngine():
             f"\n{'='*85}\n"
             f"Training Hyperparameters:\n"
             f"{'='*85}\n"
+            f"• Config Name:            {self.name}\n"
             f"• Model:                  {self.model_id}\n"
             f"• Epochs:                 {self.epochs}\n"
             f"• Batch Size:             {self.batch_size}\n"

@@ -1,10 +1,10 @@
-Name: qwen_1_7B_sft
+Name: qwen_vl_8B_sft_qlora_action
 
 Model:
-  model_id: Qwen/Qwen3-1.7B
+  model_id: Qwen/Qwen3-VL-8B-Instruct
   attention: "flash_attention_2"
   Quantization:
-    enable_quantization: False
+    enable_quantization: True
     load_in_8bit: True # True for 8bit, False for 4bit
 
 Dataset:
@@ -18,7 +18,8 @@ Dataset:
       2. Trajectory Timing: Output exactly 12 waypoints (except origin (0,0)) representing the next 6 seconds (sampled at 2Hz, 0.5s intervals).
       3. Kinematic Constraints: Ensure the gaps between waypoints are consistent with the current velocity and acceleration. Avoid sudden jumps or unrealistic lateral shifts.
       4. Safety Alignment: The trajectory must strictly follow the Navigator's safety analysis.
-  driver_user_prompt: "Predict the next 12 waypoints: (x1, y1), (x2, y2), ..., (x12, y12)."
+  # driver_user_prompt: "Predict the next 12 waypoints."
+  driver_user_prompt: "Predict the next 11 control actions (acceleration, curvature): (a1, k1), (a2, k2), ..., (a11, k11)."
 
 Train:
   epochs: 3
@@ -34,8 +35,8 @@ Train:
     lora_rank: 8
     lora_alpha: 16
     lora_dropout: 0.05
-  enable_action: False
-
+  enable_action: True
+    
 Eval:
   threshold: 2.0
   video_fps: 2
