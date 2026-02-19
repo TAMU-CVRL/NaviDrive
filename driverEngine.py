@@ -9,7 +9,7 @@ import time
 
 from tqdm import tqdm
 from datetime import datetime
-from peft import LoraConfig, prepare_model_for_kbit_training
+from peft import LoraConfig, PeftModel, prepare_model_for_kbit_training
 from transformers import (
     AutoConfig, 
     AutoModelForCausalLM, 
@@ -207,14 +207,27 @@ class driverEngine():
 
     def load_model_from_checkpoint(self, checkpoint_path):
         if checkpoint_path is None:
-            try:
-                checkpoint_path = os.path.join("checkpoints", f"{self.name}") # automatically load latest checkpoint
-            except:
-                print("Error: Checkpoint path not found.")
-                return
+            checkpoint_path = os.path.join("checkpoints", f"{self.name}")
 
         print(f"Loading model from checkpoint: {checkpoint_path}")
-        model_id = checkpoint_path
+        
+        bnb_config = None
+        if self.enable_quant:
+            model_id = self.model_id # Load base model
+            quant_config = self.cfg["Model"]["Quantization"]
+            # Load quantization config
+            if quant_config.get("load_in_4bit", False):
+                bnb_config = BitsAndBytesConfig(
+                    load_in_4bit=True,
+                    bnb_4bit_compute_dtype=torch.bfloat16,
+                    bnb_4bit_use_double_quant=True,
+                    bnb_4bit_quant_type="nf4"
+                )
+            elif quant_config.get("load_in_8bit", False):
+                bnb_config = BitsAndBytesConfig(load_in_8bit=True)      
+        else:
+            model_id = checkpoint_path
+        
         # Determine model type based on architecture
         model_config = AutoConfig.from_pretrained(
             model_id,
@@ -233,11 +246,17 @@ class driverEngine():
         # Load the model and processor
         self.model = model_class.from_pretrained(
             model_id,
+            quantization_config=bnb_config if self.enable_quant else None,
             dtype=torch.bfloat16,
             device_map="auto",
             trust_remote_code=True,
             attn_implementation=self.attention_type
         )
+        
+        if self.enable_quant:
+            print(f"Loading QLoRA adapter from: {checkpoint_path}")
+            self.model = PeftModel.from_pretrained(self.model, checkpoint_path, is_trainable=False)
+            
         print("Model loaded successfully from checkpoint.")
         processor_model = self.model_id if is_visual_model else "Qwen/Qwen3-VL-8B-Instruct"
         self.processor = AutoProcessor.from_pretrained(
