@@ -309,7 +309,7 @@ class driverEngine():
                     processor=self.processor,
                     model=self.model,
                     do_sample=True,
-                    max_new_tokens=128
+                    max_new_tokens=1024
                 )     
 
                 if torch.cuda.is_available():

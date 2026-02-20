@@ -225,13 +225,14 @@ def parse_waypoints(vlm_str):
     return waypoints
     
 def parse_string(vlm_str):
-    pattern = r"\(([^)]+)\)"
+    pattern = r"\(([-+]?\d*\.?\d+)\s*,\s*([-+]?\d*\.?\d+)\s*,\s*([-+]?\d*\.?\d+)\)" # match (x, y) pairs with optional signs and decimal points
     matches = re.findall(pattern, vlm_str)
+
+    if not matches:
+        pattern_2d = r"\(([-+]?\d*\.?\d+)\s*,\s*([-+]?\d*\.?\d+)\)"
+        matches = re.findall(pattern_2d, vlm_str)    
+        
+    results = [[float(x) for x in m] for m in matches]
+    results = np.atleast_2d(np.array(results))
     
-    results = []
-    for m in matches:
-        point = [float(x.strip()) for x in m.split(',')]
-        results.append(point)   
-    
-    results = np.array(results)
     return results

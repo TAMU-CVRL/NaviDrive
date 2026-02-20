@@ -36,5 +36,3 @@ if __name__ == "__main__":
         trainer.eval_images(eval_path=args.eval_path, start_idx=args.start_idx, end_idx=args.end_idx)
     else:
         print("Image evaluation skipped. Set --eval_images to True to enable image generation.")
-
-    

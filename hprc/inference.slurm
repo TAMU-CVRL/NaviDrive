@@ -7,8 +7,8 @@
 #SBATCH --mem=56G # request 7.5GB total memory per node; can use 7G but not 7.5G
 #SBATCH --gres=gpu:a100:1 # request 2 A100 GPU
 #SBATCH --exclude=g031
-#SBATCH --output=stdout.%x.%j # save stdout to a file with job name and JobID appended to file name
-#SBATCH --error=stderr.%x.%j # save stdout to a file with job name and JobID appended to file name
+#SBATCH --output=hprc/stdout.%x.%j # save stdout to a file with job name and JobID appended to file name
+#SBATCH --error=hprc/stderr.%x.%j # save stdout to a file with job name and JobID appended to file name
 #SBATCH --mail-user=ximeng@tamu.edu # send email to this address
 #SBATCH --mail-type=END # send email per job event: BEGIN, END, FAIL, ALL
 #SBATCH --job-name=inference_8B_qlora # specify job name

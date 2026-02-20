@@ -2,7 +2,7 @@
 
 set -e
 
-CONFIG_NAME="qwen_1_7B_sft_action_Qwen_8B" # Specify the configuration name (without .yaml extension)
+CONFIG_NAME="qwen_1_7B_sft_Gemini" # Specify the configuration name (without .yaml extension)
 CONFIG_FILE="configs/${CONFIG_NAME}.yaml"
 
 echo "=================================================="

@@ -1,4 +1,4 @@
-Name: qwen_1_7B_sft
+Name: qwen_1_7B_sft_Qwen_8B
 
 Model:
   model_id: Qwen/Qwen3-1.7B
