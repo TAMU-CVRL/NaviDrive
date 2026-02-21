@@ -9,6 +9,7 @@ from scipy.linalg import solve
 from nuscenes.utils.geometry_utils import view_points
 import yaml
 import re
+from qwen_vl_utils import process_vision_info
 
 def save_triplet_dataset_jsonl(dataset, save_jsonl_path, split, rel_image_dir, rel_lidar_dir, image_format='png', lidar_format='npy'):
     # 1. Anchor the absolute path relative to where the JSONL is stored
@@ -415,6 +416,104 @@ def preprocess_data(examples, driver_user_prompt, system_prompt, enable_action=F
         "prompt": all_prompts,
         "completion": all_completions
     }
+
+def preprocess_data_img(examples, driver_user_prompt, enable_action=False):
+    all_prompts = []
+    all_completions = []
+    all_image_paths = []
+    
+    for i in range(len(examples['token'])):
+        # only keep x,y for the prompt, remove theta if exists
+        wp_past = filter_to_xy_str(examples['wp_past'][i])
+        if not enable_action:
+            wp_future = filter_to_xy_str(examples['wp_future'][i])
+        else:
+            wp_future = filter_to_xy_str(examples['action_future'][i])
+        
+        ego_status_prompt = (
+            f"Current Dynamics:\n"
+            f"- Velocity: {examples['vel_val'][i]:.2f} m/s\n"
+            f"- Yaw Rate: {examples['yr_val'][i]:.2f} rad/s\n"
+            f"- Acceleration (Longitudinal x, Lateral y): {examples['acc_val'][i]}\n"
+            f"- Past Trajectory (2Hz): {wp_past}\n"
+            # f"- High-level Command: {examples['command'][i]}\n\n"
+        )
+            
+        reasons_list = examples['reasons'][i]
+        relative_paths = examples['image_paths'][i]
+        
+        for reason_text in reasons_list:           
+            full_driver_prompt = (
+                f"Navigator's Analysis and Instructions:\n{reason_text}\n\n"
+                f"{ego_status_prompt}\n"
+                f"{driver_user_prompt}"
+            )
+            all_image_paths.append(relative_paths)
+            all_prompts.append(full_driver_prompt)
+            all_completions.append(wp_future)
+            
+    return {
+        "prompt": all_prompts,
+        "completion": all_completions,
+        "image_paths": all_image_paths
+    }
+    
+def collate_fn(batch, processor, system_prompt, nuscenes_dataroot, enable_image=False):
+    messages_batch = []
+    
+    for item in batch:
+        text_prompt = item['prompt']
+        completion = item['completion']
+        image_paths = item['image_paths']
+
+        user_content = []
+        if enable_image:
+            for p in image_paths:
+                full_path = os.path.join(nuscenes_dataroot, p)
+                user_content.append({"type": "image", "image": full_path})
+                
+        user_content.append({"type": "text", "text": text_prompt})
+                        
+        prompt_messages = [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_content}
+        ]
+        completion_message = [{"role": "assistant", "content": [{"type": "text", "text": f"{completion}."}]}]
+        messages_batch.append(prompt_messages + completion_message)     
+
+    texts = [processor.apply_chat_template(m, tokenize=False, add_generation_prompt=False) for m in messages_batch]
+    image_inputs, video_inputs = process_vision_info(messages_batch) # If there is no image, image_inputs is None
+
+    inputs = processor(
+            text=texts,
+            images=image_inputs,
+            videos=video_inputs,
+            padding=True,
+            return_tensors="pt",
+        )        
+
+    labels = inputs["input_ids"].clone()
+    
+    for i in range(len(batch)):
+        prompt_m = messages_batch[i][:-1] # [System, User, Assistant]
+        p_text = processor.apply_chat_template(prompt_m, tokenize=False, add_generation_prompt=True)
+        
+        current_img = None
+        if image_inputs is not None:
+            current_img = image_inputs[i]
+        
+        p_inputs = processor(text=[p_text], 
+                            images=[current_img] if current_img is not None else None,
+                            return_tensors="pt") # text + image
+        prompt_len = p_inputs["input_ids"].shape[1]
+        
+        # Mask prompt
+        labels[i, :prompt_len] = -100
+
+    labels[inputs["attention_mask"] == 0] = -100
+    inputs["labels"] = labels   
+
+    return inputs
 
 def preprocess_data_action(examples):
     all_prompts = []

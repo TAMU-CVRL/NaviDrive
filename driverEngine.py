@@ -9,8 +9,10 @@ import time
 
 from tqdm import tqdm
 from datetime import datetime
-from peft import LoraConfig, PeftModel, prepare_model_for_kbit_training
+from peft import LoraConfig, PeftModel, prepare_model_for_kbit_training, get_peft_model
 from transformers import (
+    Trainer,
+    TrainingArguments,
     AutoConfig, 
     AutoModelForCausalLM, 
     AutoModelForImageTextToText, 
@@ -20,8 +22,9 @@ from transformers import (
 from datasets import load_dataset
 from trl import SFTTrainer, SFTConfig
 from nuscenes.nuscenes import NuScenes
+from qwen_vl_utils import process_vision_info
 
-from utils.data_utils import preprocess_data, preprocess_data_action, load_config, compute_trajectory_2, filter_to_xy_str
+from utils.data_utils import preprocess_data, preprocess_data_img, collate_fn, load_config, compute_trajectory_2, filter_to_xy_str
 from utils.caption_utils import reason_generate, parse_waypoints, parse_string
 from utils.results_utils import calculate_metrics, format_results, render_frame
 
@@ -39,7 +42,7 @@ class driverEngine():
         # Data Paths
         self.train_data_path = cfg["Dataset"]["train_data_path"]
         self.mini_data_path = cfg["Dataset"]["mini_data_path"]
-        
+        self.nuscenes_dataroot = cfg["Dataset"]["nuscenes_dataroot"]
         # Prompts
         self.system_prompt = cfg["Dataset"]["system_prompt"]
         self.driver_user_prompt = cfg["Dataset"]["driver_user_prompt"]
@@ -56,6 +59,8 @@ class driverEngine():
         self.log_to = self.train_cfg["log_to"]
         self.max_length = self.train_cfg["max_length"]
         self.enable_action = self.train_cfg.get("enable_action", False)
+        self.enable_image = self.train_cfg.get("enable_image", False)
+        self.image_indices = self.train_cfg.get("image_indices", None)
         
     def init_wandb(self):
         wandb.init(
@@ -125,7 +130,7 @@ class driverEngine():
         self.processor = AutoProcessor.from_pretrained(
             processor_model,
             min_pixels=128*28*28,
-            max_pixels=512*28*28, # limit image resolution
+            max_pixels=224*28*28, # limit image resolution
             trust_remote_code=True
         )
 
@@ -136,13 +141,22 @@ class driverEngine():
     def load_dataset(self):
         print("Loading dataset from:", self.train_data_path)
         raw_dataset = load_dataset("json", data_files=self.train_data_path, split="train")
+        # self.train_dataset = raw_dataset.map(
+        #     preprocess_data,
+        #     batched=True,
+        #     remove_columns=raw_dataset.column_names,
+        #     fn_kwargs={
+        #         "driver_user_prompt": self.driver_user_prompt,
+        #         "system_prompt": self.system_prompt,
+        #         "enable_action": self.enable_action
+        #     },
+        # )
         self.train_dataset = raw_dataset.map(
-            preprocess_data, # TODO: support for waypoints and controls
+            preprocess_data_img,
             batched=True,
             remove_columns=raw_dataset.column_names,
             fn_kwargs={
                 "driver_user_prompt": self.driver_user_prompt,
-                "system_prompt": self.system_prompt,
                 "enable_action": self.enable_action
             },
         )
@@ -174,7 +188,23 @@ class driverEngine():
         output_dir = os.path.join("checkpoints", f"{self.name}")
         
         # SFTTrainer configuration
-        sft_config = SFTConfig(
+        # sft_config = SFTConfig(
+        #     output_dir=output_dir,
+        #     per_device_train_batch_size=self.batch_size,
+        #     gradient_accumulation_steps=self.gradient_accumulation_steps,
+        #     learning_rate=self.learning_rate,
+        #     num_train_epochs=self.epochs,
+        #     lr_scheduler_type=self.lr_scheduler_type,
+        #     optim=self.optimizer,
+        #     weight_decay=self.weight_decay,
+        #     report_to=self.log_to,
+        #     max_length=self.max_length,
+        #     completion_only_loss=True,
+        #     save_strategy="epoch",
+        #     save_total_limit=1
+        # )
+
+        training_args = TrainingArguments(
             output_dir=output_dir,
             per_device_train_batch_size=self.batch_size,
             gradient_accumulation_steps=self.gradient_accumulation_steps,
@@ -184,19 +214,39 @@ class driverEngine():
             optim=self.optimizer,
             weight_decay=self.weight_decay,
             report_to=self.log_to,
-            max_length=self.max_length,
-            completion_only_loss=True,
             save_strategy="epoch",
-            save_total_limit=1
+            save_total_limit=1,
+            remove_unused_columns=False, 
         )
         
         peft_config = self.get_lora_config() if self.enable_quant else None # When using quantization, we enable LoRA by default to allow fine-tuning
-        trainer = SFTTrainer(
+        if peft_config is not None:
+            self.model = prepare_model_for_kbit_training(self.model)
+            self.model = get_peft_model(self.model, peft_config)
+            self.model.print_trainable_parameters()
+            
+        collator = dataCollator(
+            processor=self.processor,
+            system_prompt=self.system_prompt,
+            nuscenes_dataroot=self.nuscenes_dataroot,
+            enable_image=self.enable_image,
+            image_indices=self.image_indices
+        )
+        
+        # trainer = SFTTrainer(
+        #     model=self.model,
+        #     args=sft_config,
+        #     train_dataset=self.train_dataset,
+        #     data_collator=collator,
+        #     # processing_class=self.processor,
+        #     peft_config=peft_config
+        # )
+
+        trainer = Trainer(
             model=self.model,
-            args=sft_config,
+            args=training_args,
             train_dataset=self.train_dataset,
-            processing_class=self.processor,
-            peft_config=peft_config
+            data_collator=collator, 
         )
         
         print("Starting training...")
@@ -297,21 +347,57 @@ class driverEngine():
                     f"{self.driver_user_prompt}"
                 )
 
+                # Process the prompt, either with or without images
+                if self.enable_image:
+                    image_paths = data['image_paths']
+                    if self.image_indices is not None:
+                        selected_paths = [image_paths[i] for i in self.image_indices if i < len(image_paths)]
+                    else:
+                        selected_paths = image_paths
+                        
+                    prompt_messages = [
+                        {"role": "system", "content": self.system_prompt},
+                        {"role": "user", "content": (
+                            [{"type": "image", "image": os.path.join(self.nuscenes_dataroot, p)} for p in selected_paths] +
+                            [{"type": "text", "text": full_driver_prompt}]
+                        )}
+                    ]
+                else:
+                    prompt_messages = [
+                        {"role": "system", "content": self.system_prompt},
+                        {"role": "user", "content": full_driver_prompt}
+                    ]
+                    
+                prompt_text = self.processor.apply_chat_template(prompt_messages, tokenize=False, add_generation_prompt=True)
+                image_inputs, video_inputs = process_vision_info([prompt_messages])
+
+                inputs = self.processor(
+                    text=[prompt_text],
+                    images=image_inputs if image_inputs else None,
+                    videos=video_inputs if video_inputs else None,
+                    padding=True,
+                    return_tensors="pt",
+                ).to(self.model.device)
+                             
                 if torch.cuda.is_available():
                     torch.cuda.synchronize()
                 m_start = time.perf_counter()      
-                          
-                # Model Inference
-                _, output = reason_generate(
-                    user=full_driver_prompt,
-                    system=self.system_prompt,
-                    # images=pil_images,
-                    processor=self.processor,
-                    model=self.model,
-                    do_sample=True,
-                    max_new_tokens=1024
-                )     
 
+                # # Model Inference
+                # _, output = reason_generate(
+                #     user=full_driver_prompt,
+                #     system=self.system_prompt,
+                #     # images=pil_images,
+                #     processor=self.processor,
+                #     model=self.model,
+                #     do_sample=True,
+                #     max_new_tokens=1024
+                # )     
+                
+                with torch.no_grad():
+                    output_ids = self.model.generate(**inputs, max_new_tokens=1024)
+                output = self.processor.decode(output_ids[0][inputs["input_ids"].shape[1]:], skip_special_tokens=True)
+                
                 if torch.cuda.is_available():
                     torch.cuda.synchronize()
                 model_latencies.append(time.perf_counter() - m_start)
@@ -364,7 +450,7 @@ class driverEngine():
     
     def get_nusc(self, version="v1.0-trainval"):
         print("Loading NuScenes...")
-        self.nusc = NuScenes(version=version, dataroot=self.cfg["Dataset"]["nuscenes_dataroot"], verbose=False)
+        self.nusc = NuScenes(version=version, dataroot=self.nuscenes_dataroot, verbose=False)
         return self.nusc
     
     def eval_L2(self, eval_path=None):
@@ -512,6 +598,73 @@ class driverEngine():
             f"{'='*85}\n"
         )
         return info
+
+class dataCollator():
+    def __init__(self, processor, system_prompt, nuscenes_dataroot, enable_image, image_indices=None):
+        self.processor = processor
+        self.system_prompt = system_prompt
+        self.nuscenes_dataroot = nuscenes_dataroot
+        self.enable_image = enable_image
+        self.image_indices = image_indices
+        
+    def __call__(self, batch):
+        messages_batch = []
+        
+        for item in batch:
+            text_prompt = item['prompt']
+            completion = item['completion']
+            image_paths = item['image_paths']
+
+            user_content = []
+            if self.enable_image:
+                if self.image_indices is not None:
+                    selected_paths = [image_paths[idx] for idx in self.image_indices if idx < len(image_paths)]
+                else:
+                    selected_paths = image_paths
+                    
+                for p in selected_paths:
+                    full_path = os.path.join(self.nuscenes_dataroot, p)
+                    user_content.append({"type": "image", "image": full_path})
+                    
+            user_content.append({"type": "text", "text": text_prompt})
+                            
+            prompt_messages = [
+                {"role": "system", "content": self.system_prompt},
+                {"role": "user", "content": user_content}
+            ]
+            completion_message = [{"role": "assistant", "content": [{"type": "text", "text": f"{completion}."}]}]
+            messages_batch.append(prompt_messages + completion_message)     
+
+        texts = [self.processor.apply_chat_template(m, tokenize=False, add_generation_prompt=False) for m in messages_batch]
+        image_inputs, video_inputs = process_vision_info(messages_batch) # If there is no image, image_inputs is None
+
+        inputs = self.processor(
+                text=texts,
+                images=image_inputs,
+                videos=video_inputs,
+                padding=True,
+                return_tensors="pt",
+            )        
+
+        labels = inputs["input_ids"].clone() # All tokens
+        
+        for i in range(len(batch)):
+            prompt_m = messages_batch[i][:-1] # [System, User]
+            p_text = self.processor.apply_chat_template(prompt_m, tokenize=False, add_generation_prompt=True)
+            p_image_inputs, p_video_inputs = process_vision_info([prompt_m])
+            p_inputs = self.processor(
+                text=[p_text], 
+                images=p_image_inputs,
+                videos=p_video_inputs,
+                return_tensors="pt"
+            )
+            prompt_len = p_inputs["input_ids"].shape[1] # Length of prompt
+            labels[i, :prompt_len] = -100 # Mask prompt
+
+        labels[inputs["attention_mask"] == 0] = -100
+        inputs["labels"] = labels   
+
+        return inputs
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Train a samll-size driver LLM")
