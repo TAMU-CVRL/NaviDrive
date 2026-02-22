@@ -417,7 +417,7 @@ def preprocess_data(examples, driver_user_prompt, system_prompt, enable_action=F
         "completion": all_completions
     }
 
-def preprocess_data_img(examples, driver_user_prompt, enable_action=False):
+def preprocess_data_img(examples, driver_user_prompt, enable_action=False, enable_reason=True):
     all_prompts = []
     all_completions = []
     all_image_paths = []
@@ -442,16 +442,25 @@ def preprocess_data_img(examples, driver_user_prompt, enable_action=False):
         reasons_list = examples['reasons'][i]
         relative_paths = examples['image_paths'][i]
         
-        for reason_text in reasons_list:           
+        if enable_reason:
+            for reason_text in reasons_list:           
+                full_driver_prompt = (
+                    f"Navigator's Analysis and Instructions:\n{reason_text}\n\n"
+                    f"{ego_status_prompt}\n"
+                    f"{driver_user_prompt}"
+                )
+                all_image_paths.append(relative_paths)
+                all_prompts.append(full_driver_prompt)
+                all_completions.append(wp_future)
+        else:
             full_driver_prompt = (
-                f"Navigator's Analysis and Instructions:\n{reason_text}\n\n"
                 f"{ego_status_prompt}\n"
                 f"{driver_user_prompt}"
             )
             all_image_paths.append(relative_paths)
             all_prompts.append(full_driver_prompt)
             all_completions.append(wp_future)
-            
+        
     return {
         "prompt": all_prompts,
         "completion": all_completions,

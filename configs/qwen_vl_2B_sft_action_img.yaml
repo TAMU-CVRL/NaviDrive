@@ -20,7 +20,7 @@ Dataset:
       4. Safety Alignment: The trajectory must strictly follow the Navigator's safety analysis.
   # driver_user_prompt: "Predict the next 12 waypoints."
   driver_user_prompt: |
-      Input one front images.
+      Input one front image.
       Predict the next 11 control actions (acceleration, curvature): (a1, k1), (a2, k2), ..., (a11, k11).
 
 Train:

@@ -58,9 +58,12 @@ class driverEngine():
         self.weight_decay = self.train_cfg["weight_decay"]
         self.log_to = self.train_cfg["log_to"]
         self.max_length = self.train_cfg["max_length"]
+        
+        # Flags
         self.enable_action = self.train_cfg.get("enable_action", False)
         self.enable_image = self.train_cfg.get("enable_image", False)
         self.image_indices = self.train_cfg.get("image_indices", None)
+        self.enable_reason = self.train_cfg.get("enable_reason", True)
         
     def init_wandb(self):
         wandb.init(
@@ -157,7 +160,8 @@ class driverEngine():
             remove_columns=raw_dataset.column_names,
             fn_kwargs={
                 "driver_user_prompt": self.driver_user_prompt,
-                "enable_action": self.enable_action
+                "enable_action": self.enable_action,
+                "enable_reason": self.enable_reason
             },
         )
         print(f"Dataset expanded: {len(raw_dataset)} -> {len(self.train_dataset)} samples.")
@@ -214,6 +218,8 @@ class driverEngine():
             optim=self.optimizer,
             weight_decay=self.weight_decay,
             report_to=self.log_to,
+            logging_strategy="steps",
+            logging_steps=10,
             save_strategy="epoch",
             save_total_limit=1,
             remove_unused_columns=False, 

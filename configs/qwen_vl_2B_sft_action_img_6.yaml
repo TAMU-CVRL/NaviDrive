@@ -1,4 +1,4 @@
-Name: qwen_vl_2B_sft_action
+Name: qwen_vl_2B_sft_action_img_6
 
 Model:
   model_id: Qwen/Qwen3-VL-2B-Instruct
@@ -19,11 +19,13 @@ Dataset:
       3. Kinematic Constraints: Ensure the gaps between waypoints are consistent with the current velocity and acceleration. Avoid sudden jumps or unrealistic lateral shifts.
       4. Safety Alignment: The trajectory must strictly follow the Navigator's safety analysis.
   # driver_user_prompt: "Predict the next 12 waypoints."
-  driver_user_prompt: "Predict the next 11 control actions (acceleration, curvature): (a1, k1), (a2, k2), ..., (a11, k11)."
+  driver_user_prompt: |
+      Input one front image.
+      Predict the next 11 control actions (acceleration, curvature): (a1, k1), (a2, k2), ..., (a11, k11).
 
 Train:
-  epochs: 3
-  batch_size: 2
+  epochs: 1
+  batch_size: 1
   gradient_accumulation_steps: 16
   learning_rate: 1.0e-5
   lr_scheduler_type: "cosine"
@@ -32,13 +34,13 @@ Train:
   log_to: "wandb"
   max_length: 4096
   LoRA:
-    lora_rank: 8
-    lora_alpha: 16
+    lora_rank: 64
+    lora_alpha: 128
     lora_dropout: 0.05
   enable_action: True
-  enable_image: False
-  enable_reason: True
-  
+  enable_image: True
+  image_indices: [1] # front_left, front, front_right, back_right, back, back_left
+
 Eval:
   threshold: 2.0
   video_fps: 2
