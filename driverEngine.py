@@ -64,6 +64,7 @@ class driverEngine():
         self.enable_image = self.train_cfg.get("enable_image", False)
         self.image_indices = self.train_cfg.get("image_indices", None)
         self.enable_reason = self.train_cfg.get("enable_reason", True)
+        self.enable_command = self.cfg["Dataset"].get("enable_command", False)
         
     def init_wandb(self):
         wandb.init(
@@ -141,7 +142,7 @@ class driverEngine():
             self.processor.tokenizer.pad_token = self.processor.tokenizer.eos_token
         self.processor.tokenizer.padding_side = "right"
     
-    def load_dataset(self):
+    def _load_dataset(self):
         print("Loading dataset from:", self.train_data_path)
         raw_dataset = load_dataset("json", data_files=self.train_data_path, split="train")
         # self.train_dataset = raw_dataset.map(
@@ -161,7 +162,8 @@ class driverEngine():
             fn_kwargs={
                 "driver_user_prompt": self.driver_user_prompt,
                 "enable_action": self.enable_action,
-                "enable_reason": self.enable_reason
+                "enable_reason": self.enable_reason,
+                "enable_command": self.enable_command
             },
         )
         print(f"Dataset expanded: {len(raw_dataset)} -> {len(self.train_dataset)} samples.")
@@ -186,7 +188,7 @@ class driverEngine():
         else:
             self.load_model()
         self.init_wandb()
-        self.load_dataset()
+        self._load_dataset()
         print(f"Hyperparameters:\n {self.hyper_info}")
         # output_dir = os.path.join("checkpoints", f"{self.name}_{self.date_str}")
         output_dir = os.path.join("checkpoints", f"{self.name}")
@@ -261,7 +263,7 @@ class driverEngine():
         trainer.save_model(output_dir)
         print(f"Model saved to {output_dir}")
 
-    def load_model_from_checkpoint(self, checkpoint_path):
+    def load_model_from_checkpoint(self, checkpoint_path=None):
         if checkpoint_path is None:
             checkpoint_path = os.path.join("checkpoints", f"{self.name}")
 
@@ -322,7 +324,7 @@ class driverEngine():
             trust_remote_code=True
         )
                 
-    def inference(self, inference_path=None):
+    def inference(self, inference_path=None, temperature=0.7, top_p=0.8, num_trajectories=6):
         # output_dir = os.path.join("results/inference", f"{self.name}_{self.date_str}.jsonl")
         output_dir = os.path.join("results/inference", f"{self.name}.jsonl")
         os.makedirs(os.path.dirname(output_dir), exist_ok=True)
@@ -335,21 +337,33 @@ class driverEngine():
             num_samples = len(lines)
             for line in tqdm(lines, desc="Inference"):
                 data = json.loads(line)
-                xy_past = filter_to_xy_str(data['wp_past'])   
+                wp_past = filter_to_xy_str(data['wp_past'])   
                  
+                # ego_status_prompt = (
+                #     "Current Dynamics:\n"
+                #     f"- Velocity: {data['vel_val']} m/s.\n"
+                #     f"- Yaw Rate: {data['yr_val']} rad/s.\n"
+                #     f"- Acceleration (Longitudinal x, Lateral y): {data['acc_val']} m/s^2.\n"
+                #     f"- Past Trajectory (2Hz): {wp_past} m.\n"
+                #     f"- High-level Command: {data['command']}\n\n"
+                # )
+
+                command_str = f"High-level Command: {data['command'][i]}\n" if self.enable_command else ""
+                
                 ego_status_prompt = (
                     "Current Dynamics:\n"
-                    f"- Velocity: {data['vel_val']} m/s.\n"
-                    f"- Yaw Rate: {data['yr_val']} rad/s.\n"
-                    f"- Acceleration (Longitudinal x, Lateral y): {data['acc_val']} m/s^2.\n"
-                    f"- Past Trajectory (2Hz): {xy_past} m.\n\n"
-                    # f"- High-level Command: {data['command']}\n"
+                    f"- Velocity: {data['vel_val'][i]:.2f} m/s\n"
+                    f"- Yaw Rate: {data['yr_val'][i]:.2f} rad/s\n"
+                    f"- Acceleration (Longitudinal x, Lateral y): {data['acc_val'][i]}\n"
+                    f"Past Trajectory (2Hz): {wp_past}\n"
+                    f"{command_str}\n"
                 )
-                
+            
                 reason = data['reasons'][0] if isinstance(data['reasons'], list) else data['reasons']
                 full_driver_prompt = (
-                    f"Navigator's Analysis and Instructions:\n{reason}\n\n"
-                    f"{ego_status_prompt}\n"
+                    # f"Navigator's Analysis and Instructions:\n{reason}\n\n"
+                    f"{reason}\n\n"
+                    f"{ego_status_prompt}"
                     f"{self.driver_user_prompt}"
                 )
 
@@ -401,39 +415,59 @@ class driverEngine():
                 # )     
                 
                 with torch.no_grad():
-                    output_ids = self.model.generate(**inputs, max_new_tokens=1024)
-                output = self.processor.decode(output_ids[0][inputs["input_ids"].shape[1]:], skip_special_tokens=True)
+                    output_ids = self.model.generate(**inputs, 
+                                                     max_new_tokens=1024, 
+                                                     do_sample=True, 
+                                                     temperature=temperature, 
+                                                     top_p=top_p,
+                                                     num_return_sequences=num_trajectories)
+                # output = self.processor.decode(output_ids[0][inputs["input_ids"].shape[1]:], skip_special_tokens=True)
                 
                 if torch.cuda.is_available():
                     torch.cuda.synchronize()
                 model_latencies.append(time.perf_counter() - m_start)
+
+                input_len = inputs["input_ids"].shape[1]
                 
-                gt_pts = parse_string(data['wp_future'])
-                gt_pts = gt_pts[:, :2] # (x, y)
-                if not self.enable_action:
-                    # only predict waypoints without action prediction
-                    pred_pts = parse_string(output)
-                    pred_pts = pred_pts[:, :2] # (x, y)
-                else:
-                    # predict actions, then compute waypoints from predicted actions
-                    pred_actions = parse_string(output) # numpy array
-                    wp_past = parse_string(data['wp_past'])
-                    theta0 = wp_past[-1, 2] # yaw angle
-                    pred_pts = compute_trajectory_2(pred_actions, 0, 0, theta0, float(data['vel_val']), 0.5)
-                    pred_pts = np.round(pred_pts[1:], 2) # remove the first point
-                    gt_actions = parse_string(data['action_future'])
+                all_pred_waypoints = []
+                all_pred_actions = []
+                
+                for i in range(num_trajectories):
+                    try:
+                        raw_output = self.processor.decode(output_ids[i][input_len:], skip_special_tokens=True)
+
+                        if not self.enable_action:
+                            # only predict waypoints without action prediction
+                            pred_pts = parse_string(raw_output)
+                            all_pred_waypoints.append(pred_pts[:, :2].tolist())
+                        else:
+                            # predict actions, then compute waypoints from predicted actions
+                            pred_actions = parse_string(raw_output) # numpy array
+                            wp_past = parse_string(data['wp_past'])
+                            theta0 = wp_past[-1, 2] # yaw angle
+                            pred_pts = compute_trajectory_2(pred_actions, 0, 0, theta0, float(data['vel_val']), 0.5)
+                            pred_pts = np.round(pred_pts[1:], 2) # remove the first point
+
+                            all_pred_waypoints.append(pred_pts[:, :2].tolist())
+                            all_pred_actions.append(pred_actions.tolist())
+                    except Exception as e:
+                        print(e)
+                        all_pred_waypoints.append([])
+                        if self.enable_action: all_pred_actions.append([])
+                                        
+                gt_pts = parse_string(data['wp_future'])[:, :2]
                 
                 # Save Record
                 record = {
                     "token": data['token'],
                     "gt_waypoints": gt_pts.tolist(),
-                    "pred_waypoints": pred_pts.tolist(),
-                    "gt_actions": gt_actions.tolist() if self.enable_action else None,
-                    "pred_actions": pred_actions.tolist() if self.enable_action else None,
+                    "pred_waypoints": all_pred_waypoints, # [6, N, 2]
+                    "gt_actions": parse_string(data['action_future']).tolist() if self.enable_action else None,
+                    "pred_actions": all_pred_actions if self.enable_action else None, # [6, N, 2]
                     "reasons": data['reasons'],
                 }
                 f_out.write(json.dumps(record) + "\n")
-                f_out.flush()
+                # f_out.flush()
         
         overall_end = time.perf_counter()
         total_time = overall_end - overall_start
@@ -453,6 +487,80 @@ class driverEngine():
             f_out.write(f"Average Model Inference Latency: {avg_model_latency:.2f} s\n")
 
         print(f"Results saved to: {output_path}")
+
+    def inference_once(self, temperature=0.7, top_p=0.8, sample_index=0):
+        with open(self.mini_data_path, 'r', encoding='utf-8') as f:
+            lines = f.readlines()
+            data = json.loads(lines[sample_index])
+
+        wp_past = filter_to_xy_str(data['wp_past'])
+        command_str = f"High-level Command: {data['command']}\n" if self.enable_command else ""
+              
+        ego_status_prompt = (
+            "Current Dynamics:\n"
+            f"- Velocity: {data['vel_val']:.2f} m/s\n"
+            f"- Yaw Rate: {data['yr_val']:.2f} rad/s\n"
+            f"- Acceleration (Longitudinal x, Lateral y): {data['acc_val']}\n"
+            f"Past Trajectory (2Hz): {wp_past}\n"
+            f"{command_str}\n"
+        )
+        reason = data['reasons'][0] if isinstance(data['reasons'], list) else data['reasons']
+        full_driver_prompt = (
+            # f"Navigator's Analysis and Instructions:\n{reason}\n\n"
+            f"{reason}\n\n"
+            f"{ego_status_prompt}"
+            f"{self.driver_user_prompt}"
+        )
+
+        if self.enable_image:
+            image_paths = [os.path.join(self.nuscenes_dataroot, p) for p in data['image_paths']]
+            if self.image_indices:
+                image_paths = [image_paths[i] for i in self.image_indices]
+            
+            prompt_messages = [
+                {"role": "system", "content": self.system_prompt},
+                {"role": "user", "content": [{"type": "image", "image": p} for p in image_paths] + 
+                                        [{"type": "text", "text": full_driver_prompt}]}
+            ]
+        else:
+            prompt_messages = [
+                {"role": "system", "content": self.system_prompt},
+                {"role": "user", "content": full_driver_prompt}
+            ]
+
+        prompt_text = self.processor.apply_chat_template(prompt_messages, tokenize=False, add_generation_prompt=True)
+        image_inputs, video_inputs = process_vision_info([prompt_messages])
+        inputs = self.processor(text=[prompt_text], images=image_inputs, padding=True, return_tensors="pt").to(self.model.device)
+
+        print("\n" + "="*30 + " PROMPT " + "="*30)
+        print(full_driver_prompt)
+        print("="*75 + "\n")
+
+        with torch.no_grad():
+            output_ids = self.model.generate(
+                **inputs, 
+                max_new_tokens=1024,
+                do_sample=True,
+                temperature=temperature,
+                top_p=top_p,
+                num_return_sequences=6
+            )
+        
+        outputs = []
+        print("\n" + "="*30 + " 6 INDEPENDENT TRAJECTORIES " + "="*30)
+        for i in range(len(output_ids)):
+            decoded_output = self.processor.decode(
+                output_ids[i][inputs["input_ids"].shape[1]:], 
+                skip_special_tokens=True
+            )
+            outputs.append(decoded_output)
+            print(f"\n[Trajectory {i+1}]:")
+            print(decoded_output)
+        
+        gt_wp = data["wp_future"]
+        command = data["command"] if data["command"] != "None" else None
+        
+        return outputs, gt_wp, command
     
     def get_nusc(self, version="v1.0-trainval"):
         print("Loading NuScenes...")
@@ -472,12 +580,29 @@ class driverEngine():
             return
             
         with open(eval_path, 'r', encoding='utf-8') as f:
-            for line in f:
+            lines = f.readlines()
+            first_data = json.loads(lines[0])
+            is_multi = False
+            pk = 'pred_waypoints' if 'pred_waypoints' in first_data else 'predicted_output'
+            if isinstance(first_data.get(pk), list) and len(first_data[pk]) > 0 and isinstance(first_data[pk][0][0], list):
+                is_multi = True
+                print("Detected multi-modal predictions. Using minADE metric.")
+                
+            for line in lines:
                 data = json.loads(line)
-                pred_key = 'pred_waypoints' if 'pred_waypoints' in data else 'predicted_output'
-                res = calculate_metrics(data['gt_waypoints'], data[pred_key])
-                all_results.append(res)
-        
+                gt = data['gt_waypoints']
+                preds = data[pk]
+                if is_multi:
+                    candidate_metrics = []
+                    for single_pred in preds:
+                        m = calculate_metrics(gt, single_pred)
+                        candidate_metrics.append(m)
+                    best_res = min(candidate_metrics, key=lambda x: x['ade'])
+                    all_results.append(best_res)
+                else:
+                    res = calculate_metrics(gt, preds)
+                    all_results.append(res)    
+                    
         if not all_results:
             print("No valid data processed.")
             return

@@ -336,7 +336,7 @@ def format_results(avg_metrics, input_file, total_samples, threshold):
     )
     
     table_header = (
-        f"  {'Metric':<15} | {'1.0s':<10} | {'2.0s':<10} | {'3.0s':<10} | {'6.0s (FDE)':<12} | {'Avg (ADE)':<10}\n"
+        f"  {'Metric':<15} | {'1.0s':<10} | {'2.0s':<10} | {'3.0s':<10} | {'6.0s (FDE)':<12} | {'Avg (minADE)':<10}\n"
         f"  {'-'*15}-|-{'-'*10}-|-{'-'*10}-|-{'-'*10}-|-{'-'*12}-|-{'-'*10}\n"
     )
     

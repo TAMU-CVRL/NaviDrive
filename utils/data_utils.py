@@ -417,7 +417,7 @@ def preprocess_data(examples, driver_user_prompt, system_prompt, enable_action=F
         "completion": all_completions
     }
 
-def preprocess_data_img(examples, driver_user_prompt, enable_action=False, enable_reason=True):
+def preprocess_data_img(examples, driver_user_prompt, enable_action=False, enable_reason=True, enable_command=False):
     all_prompts = []
     all_completions = []
     all_image_paths = []
@@ -430,13 +430,15 @@ def preprocess_data_img(examples, driver_user_prompt, enable_action=False, enabl
         else:
             wp_future = filter_to_xy_str(examples['action_future'][i])
         
+        command_str = f"- High-level Command: {examples['command'][i]}\n" if enable_command else ""
+        
         ego_status_prompt = (
             f"Current Dynamics:\n"
             f"- Velocity: {examples['vel_val'][i]:.2f} m/s\n"
             f"- Yaw Rate: {examples['yr_val'][i]:.2f} rad/s\n"
             f"- Acceleration (Longitudinal x, Lateral y): {examples['acc_val'][i]}\n"
             f"- Past Trajectory (2Hz): {wp_past}\n"
-            # f"- High-level Command: {examples['command'][i]}\n\n"
+            f"{command_str}\n"
         )
             
         reasons_list = examples['reasons'][i]

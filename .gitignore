@@ -29,3 +29,4 @@ checkpoints/
 results/images/
 results/videos/
 results/inference/
+results/inference_single/
