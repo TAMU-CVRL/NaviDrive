@@ -2,7 +2,7 @@
 
 set -e
 
-CONFIG_NAME="qwen_vl_2B_sft_action_cmd" # Specify the configuration name (without .yaml extension)
+CONFIG_NAME="qwen_vl_2B_sft_cmd_no_res" # Specify the configuration name (without .yaml extension)
 CONFIG_FILE="configs/${CONFIG_NAME}.yaml"
 
 echo "=================================================="

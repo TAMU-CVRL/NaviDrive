@@ -1,4 +1,4 @@
-Name: qwen_vl_2B_sft_cmd
+Name: qwen_vl_2B_sft_cmd_no_res
 
 Model:
   model_id: Qwen/Qwen3-VL-2B-Instruct
@@ -37,7 +37,7 @@ Train:
     lora_dropout: 0.05
   enable_action: False
   enable_image: False
-  enable_reason: True
+  enable_reason: False
 
 Eval:
   threshold: 2.0

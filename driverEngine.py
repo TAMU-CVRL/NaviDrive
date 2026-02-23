@@ -348,13 +348,13 @@ class driverEngine():
                 #     f"- High-level Command: {data['command']}\n\n"
                 # )
 
-                command_str = f"High-level Command: {data['command'][i]}\n" if self.enable_command else ""
+                command_str = f"High-level Command: {data['command']}\n" if self.enable_command else ""
                 
                 ego_status_prompt = (
                     "Current Dynamics:\n"
-                    f"- Velocity: {data['vel_val'][i]:.2f} m/s\n"
-                    f"- Yaw Rate: {data['yr_val'][i]:.2f} rad/s\n"
-                    f"- Acceleration (Longitudinal x, Lateral y): {data['acc_val'][i]}\n"
+                    f"- Velocity: {data['vel_val']:.2f} m/s\n"
+                    f"- Yaw Rate: {data['yr_val']:.2f} rad/s\n"
+                    f"- Acceleration (Longitudinal x, Lateral y): {data['acc_val']}\n"
                     f"Past Trajectory (2Hz): {wp_past}\n"
                     f"{command_str}\n"
                 )
