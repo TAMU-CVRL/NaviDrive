@@ -633,7 +633,9 @@ class driverEngine():
         print(f"Results saved to: {output_path}")
         
     def eval_video(self, eval_path=None, start_idx=0, end_idx=None):
-        input_file = eval_path if eval_path else self.mini_data_path
+        if not eval_path:
+            eval_path = os.path.join("results", "inference", f"{self.name}.jsonl")
+        input_file = eval_path
         os.makedirs("results/videos", exist_ok=True)
         nuscenes_version = "v1.0-trainval" if eval_path else "v1.0-mini"
         nusc = self.get_nusc(version=nuscenes_version)
@@ -651,7 +653,17 @@ class driverEngine():
         video_writer = cv2.VideoWriter(output_file, fourcc, self.cfg["Eval"]["video_fps"], (width, height))
         
         for line in tqdm(selected_lines):
-            vis_img, _, _, _ = render_frame(nusc, line)
+            data = json.loads(line)
+            gt = data['gt_waypoints']
+            pk = 'pred_waypoints' if 'pred_waypoints' in data else 'predicted_output'
+            preds = data[pk]
+            
+            if isinstance(preds, list) and len(preds) > 0 and isinstance(preds[0][0], list):
+                best_traj = min(preds, key=lambda p: calculate_metrics(gt, p)['ade'])
+            else:
+                best_traj = preds            
+
+            vis_img, _, _, _ = render_frame(nusc, line, best_pred=best_traj)
             video_writer.write(vis_img)   
             
         video_writer.release()

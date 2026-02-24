@@ -2,7 +2,7 @@
 
 set -e
 
-CONFIG_NAME="qwen_vl_2B_sft_action_cmd" # Specify the configuration name (without .yaml extension)
+CONFIG_NAME="qwen_vl_2B_sft" # Specify the configuration name (without .yaml extension)
 CONFIG_FILE="configs/${CONFIG_NAME}.yaml"
 INFERENCE_PATH="data/nuscenes_reasons_val_Qwen_32B.jsonl"
 # data/nuscenes_reasons_val_Qwen_32B.jsonl

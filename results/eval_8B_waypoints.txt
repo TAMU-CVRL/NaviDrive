@@ -30,3 +30,7 @@
   > Failure Rate :  73.75 %
   > Reliability  :  26.25 % (within 2.0m)
 =====================================================================================
+
+Qwen3-VL-8B-Instruct
++ command
++ 6 trajecories

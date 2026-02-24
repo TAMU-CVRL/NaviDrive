@@ -7,6 +7,7 @@ import cv2
 import torch
 from datetime import datetime
 import json
+import textwrap
 
 def save_predicated_waypoints(pre_waypoints, gt_waypoints, index):
     # pre_waypoints: [pre_frames, 3]  nparray
@@ -359,36 +360,92 @@ def format_results(avg_metrics, input_file, total_samples, threshold):
     
     return header_section + table_header + table_row + summary_section
 
-def render_frame(nusc, line_data):
-        """Helper to process a single line of data and return the visualized image."""
-        data = json.loads(line_data)
-        
-        # Handle list vs string token format safely
-        token = data['token'][0] if isinstance(data['token'], list) else data['token']
-        
-        # Get the image from NuScenes
-        sample_rec = nusc.get('sample', token)
-        cam_data = nusc.get('sample_data', sample_rec['data']['CAM_FRONT'])
-        img_path = os.path.join(nusc.dataroot, cam_data['filename'])
-        raw_img = cv2.imread(img_path)
-
+def render_frame(nusc, line_data, best_pred=None):
+    data = json.loads(line_data) if isinstance(line_data, str) else line_data
+    
+    token = data['token'][0] if isinstance(data['token'], list) else data['token']
+    
+    sample_rec = nusc.get('sample', token)
+    cam_data = nusc.get('sample_data', sample_rec['data']['CAM_FRONT'])
+    img_path = os.path.join(nusc.dataroot, cam_data['filename'])
+    raw_img = cv2.imread(img_path)
+    img_h, img_w = raw_img.shape[:2]
+    
+    if best_pred is not None:
+        pred_pts = np.array(best_pred, dtype=np.float32)
+    else:
         pred_key = 'pred_waypoints' if 'pred_waypoints' in data else 'predicted_output'
-        pred_pts = np.array(data[pred_key], dtype=np.float32)
-        gt_pts = np.array(data['gt_waypoints'], dtype=np.float32)
-
-        # 1. Draw predicted waypoints (Red)
-        vis_img = project_wp_to_image(
-            nusc, token, pred_pts, raw_img,
-            color_waypoints=(255, 0, 0),
-            color_polygon=(200, 0, 0),
-            plot_polygon=True
-        )
-
-        # 2. Draw ground truth waypoints (Green)
-        vis_img = project_wp_to_image(
-            nusc, token, gt_pts, vis_img,
-            color_waypoints=(0, 255, 0),
-            plot_polygon=False
-        )
+        raw_preds = data[pred_key]
         
-        return vis_img, token, cam_data['width'], cam_data['height']
+        if isinstance(raw_preds, list) and len(raw_preds) > 0 and isinstance(raw_preds[0][0], list):
+            pred_pts = np.array(raw_preds[0], dtype=np.float32)
+        else:
+            pred_pts = np.array(raw_preds, dtype=np.float32)
+
+    gt_pts = np.array(data['gt_waypoints'], dtype=np.float32)
+
+    vis_img = project_wp_to_image(
+        nusc, token, pred_pts, raw_img,
+        color_waypoints=(255, 0, 0),
+        color_polygon=(200, 0, 0),
+        plot_polygon=True
+    )
+
+    vis_img = project_wp_to_image(
+        nusc, token, gt_pts, vis_img,
+        color_waypoints=(0, 255, 0),
+        plot_polygon=False
+    )
+    
+    reason = data.get('reasons', "")
+    if isinstance(reason, list): 
+        reason = reason[0] if len(reason) > 0 else ""
+    
+    if reason:
+        reason = reason.replace('\\n', '\n')
+        font = cv2.FONT_HERSHEY_SIMPLEX
+        font_scale = 0.55
+        thickness = 1
+        line_height = 25
+
+        colors = {
+            "Perception:": (0, 255, 255),
+            "Action:": (255, 100, 0),
+            "Reasoning:": (0, 255, 0)
+        }
+        
+        raw_lines = reason.split('\n')
+        final_lines = []
+        for line in raw_lines:
+            line = line.strip()
+            if not line: continue
+            wrapped = textwrap.wrap(line, width=170)
+            final_lines.extend(wrapped)
+
+        if final_lines:
+            bg_height = len(final_lines) * line_height + 20
+
+            overlay = vis_img.copy()
+            cv2.rectangle(overlay, (0, 0), (img_w, bg_height), (0, 0, 0), -1)
+            cv2.addWeighted(overlay, 0.6, vis_img, 0.4, 0, vis_img)
+            
+            for i, line_text in enumerate(final_lines):
+                y_text = 30 + i * line_height
+                x_pos = 20
+                
+                found_keyword = False
+                for kw, color in colors.items():
+                    if line_text.startswith(kw):
+                        cv2.putText(vis_img, kw, (x_pos, y_text), font, font_scale, color, thickness, cv2.LINE_AA)
+                        
+                        (tw, _), _ = cv2.getTextSize(kw, font, font_scale, thickness)
+                        content = line_text[len(kw):]
+                        cv2.putText(vis_img, content, (x_pos + tw + 5, y_text), font, font_scale, (255, 255, 255), 1, cv2.LINE_AA)
+                        
+                        found_keyword = True
+                        break
+                
+                if not found_keyword:
+                    cv2.putText(vis_img, line_text, (x_pos, y_text), font, font_scale, (255, 255, 255), 1, cv2.LINE_AA)
+    
+    return vis_img, token, cam_data['width'], cam_data['height']
