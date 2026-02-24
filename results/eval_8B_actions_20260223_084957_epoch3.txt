@@ -1,0 +1,34 @@
+
+=====================================================================================
+  Training Hyperparameters:
+=====================================================================================
+  • Mode:                   ACTIONS → WAYPOINTS
+  • Model:                  Qwen/Qwen2.5-VL-7B-Instruct
+  • Checkpoint:             checkpoints/qwen25-7b-dllm-sft-actions/checkpoint-777
+  • LoRA r:                 64
+  • LoRA alpha:             128
+  • LoRA dropout:           0.05
+  • Target Modules:         ['q_proj', 'gate_proj', 'o_proj', 'down_proj', 'k_proj', 'v_proj', 'up_proj']
+  • Epochs:                 3
+  • Batch Size:             8
+  • Gradient Accumulation:  8
+  • Learning Rate:          1e-05
+  • LR Scheduler:           cosine
+  • Optimizer:              adamw_torch
+=====================================================================================
+=====================================================================================
+  TRAJECTORY EVALUATION REPORT (ACTIONS → WAYPOINTS)  |  2026-02-23 08:49:57
+=====================================================================================
+  [Input File]  : data/nuscenes_reasons_val_Qwen_32B.jsonl
+  [Sample Count]: 3619
+  [Parse Failures]: 0
+  [Failure Thresh] : 2.0 m
+-------------------------------------------------------------------------------------
+  Metric          | 1.0s       | 2.0s       | 3.0s       | 6.0s (FDE)   | Avg (ADE) 
+  ----------------|------------|------------|------------|--------------|-----------
+  L2 Error (m)    | 0.287      | 0.780      | 1.657      | 5.584        | 2.147     
+-------------------------------------------------------------------------------------
+  OVERALL PERFORMANCE
+  > Failure Rate :  71.98 %
+  > Reliability  :  28.02 % (within 2.0m)
+=====================================================================================
