@@ -2,7 +2,8 @@
 
 set -e
 
-CONFIG_NAME="qwen_vl_8B_sft_qlora_cmd_img_6_no_res" # Specify the configuration name (without .yaml extension)
+# CONFIG_NAME="qwen_vl_4B_sft_cmd_img" # Specify the configuration name (without .yaml extension)
+CONFIG_NAME="qwen_vl_32B_img_6"
 CONFIG_FILE="configs/${CONFIG_NAME}.yaml"
 
 echo "=================================================="

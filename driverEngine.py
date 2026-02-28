@@ -489,10 +489,26 @@ class driverEngine():
         print(f"Results saved to: {output_path}")
 
     def inference_once(self, temperature=0.7, top_p=0.8, sample_index=0):
-        with open(self.mini_data_path, 'r', encoding='utf-8') as f:
-            lines = f.readlines()
-            data = json.loads(lines[sample_index])
+        # reason_path = self.train_data_path # include reasons, image related path
+        eval_path = "data/nuscenes_reasons_val_Qwen_32B.jsonl"
+        def get_line(path, index):
+            with open(path, 'r', encoding='utf-8') as f:
+                for i, line in enumerate(f):
+                    if i == index:
+                        return json.loads(line)
+            return None
 
+        # r_data = get_line(eval_path, sample_index)
+        data = get_line(eval_path, sample_index)
+        token = data['token']
+        # rel_image_paths = data['image_paths']
+        # abs_image_paths = []
+        # for rel_path in rel_image_paths:
+        #     abs_image_paths.append(os.path.join(self.nuscenes_dataroot, rel_path))
+
+        # nusc = self.get_nusc(version="v1.0-trainval")        
+        # vis_img, token, _, _ = render_frame(nusc, r_data)
+        
         wp_past = filter_to_xy_str(data['wp_past'])
         command_str = f"High-level Command: {data['command']}\n" if self.enable_command else ""
               
@@ -560,7 +576,7 @@ class driverEngine():
         gt_wp = data["wp_future"]
         command = data["command"] if data["command"] != "None" else None
         
-        return outputs, gt_wp, command
+        return outputs, gt_wp, command, token
     
     def get_nusc(self, version="v1.0-trainval"):
         print("Loading NuScenes...")
