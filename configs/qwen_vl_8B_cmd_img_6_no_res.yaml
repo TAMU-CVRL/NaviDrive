@@ -18,6 +18,7 @@ Dataset:
       2. Trajectory Timing: Output exactly 12 waypoints (except origin (0,0)) representing the next 6 seconds (sampled at 2Hz, 0.5s intervals).
       3. Kinematic Constraints: Ensure the gaps between waypoints are consistent with the current velocity and acceleration. Avoid sudden jumps or unrealistic lateral shifts.
       4. Safety Alignment: The trajectory must strictly follow the Navigator's safety analysis.
+      5. Output Format: Only output the coordinates: (x1, y1), (x2, y2), ..., (x12, y12).
   # driver_user_prompt: "Predict the next 12 waypoints."
   driver_user_prompt: |
       Input six images: front_left, front, front_right, back_right, back, back_left

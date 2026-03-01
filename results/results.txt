@@ -844,3 +844,23 @@ Average Model Inference Latency: 14.68 s
   > Reliability  :  54.49 % (within 2.0m)
 =====================================================================================
 ====================================================================================================
+
+=====================================================================================
+Training Hyperparameters:
+=====================================================================================
+• Config Name:            qwen_vl_2B_cmd_img_6_no_res
+• Model:                  Qwen/Qwen3-VL-2B-Instruct
+• Epochs:                 3
+• Batch Size:             1
+• Gradient Accumulation:  16
+• Learning Rate:          1e-05
+• LR Scheduler:           cosine
+• Optimizer:              adamw_torch
+• Weight Decay:           0.01
+• Log To:                 wandb
+• Max Length:             4096
+• LoRA:                   False
+=====================================================================================
+Total Inference Time: 17277.48 s
+Average Latency per Sample: 4.77 s
+Average Model Inference Latency: 4.59 s

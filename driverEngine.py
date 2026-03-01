@@ -521,6 +521,7 @@ class driverEngine():
             f"{command_str}\n"
         )
         reason = data['reasons'][0] if isinstance(data['reasons'], list) else data['reasons']
+        # reason = ""
         full_driver_prompt = (
             # f"Navigator's Analysis and Instructions:\n{reason}\n\n"
             f"{reason}\n\n"
