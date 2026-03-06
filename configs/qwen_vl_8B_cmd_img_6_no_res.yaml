@@ -22,7 +22,7 @@ Dataset:
   # driver_user_prompt: "Predict the next 12 waypoints."
   driver_user_prompt: |
       Input six images: front_left, front, front_right, back_right, back, back_left
-      Predict the next 12 waypoints: (x1, y1), (x2, y2), ..., (x12, y12).
+      Predict the next 12 waypoints (wihtout the origin): (x1, y1), (x2, y2), ..., (x12, y12).
   enable_command: True
 
 Train:

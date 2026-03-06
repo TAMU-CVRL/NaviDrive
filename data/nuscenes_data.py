@@ -288,54 +288,24 @@ class NuscenesData(Dataset):
 
         return all_instances
 
-    #TODO: commands are not accurate enough, need to improve
-    def classify_command(self, future_waypoints, cur_waypoint, stop_thresh=1.0, lane_width=3.5, uturn_thresh=np.deg2rad(150), turn_thresh=np.deg2rad(45)):
-        # 1. Data Extraction
+    def classify_command(self, future_waypoints, x_stop_th=5.0, y_slight_th=2.0, y_hard_th=5.0):
+        # Get the very last point from the tensor/array
+        # Assuming shape [N, 3] where 3 is (x, y, yaw)
         data = future_waypoints.numpy() if isinstance(future_waypoints, torch.Tensor) else future_waypoints
-        pts = data[:, :2]
-        headings = data[:, 2]
+        last_pt = data[-1]
+        x_last, y_last = last_pt[0], last_pt[1]
+
+        if x_last <= x_stop_th:
+            return "<Decelerate_Stop>"
         
-        curr_pose_np = cur_waypoint.numpy().flatten() if isinstance(cur_waypoint, torch.Tensor) else cur_waypoint.flatten()
-        curr_heading = curr_pose_np[2]
-
-        start_pos = pts[0]
-        end_pos = pts[-1]
-        total_dist = np.linalg.norm(end_pos - start_pos)
-
-        # 2. Stop Identification
-        if total_dist < stop_thresh:
-            return "Stop"
-
-        # 3. Reverse Identification
-        start_move_vec = pts[min(5, len(pts)-1)] - start_pos
-        current_heading_vec = np.array([np.cos(curr_heading), np.sin(curr_heading)])
-        if np.dot(start_move_vec, current_heading_vec) < 0:
-            return "Reverse"
-
-        # 4. Cumulative Yaw Calculation
-        yaw_diffs = np.diff(headings)
-        yaw_diffs = (yaw_diffs + np.pi) % (2 * np.pi) - np.pi
-        total_yaw_change = np.sum(yaw_diffs)
-
-        # 5. Lateral Displacement Calculation
-        abs_yaw_change = abs(total_yaw_change)
-        
-        if abs_yaw_change > uturn_thresh:
-                return "U-turn"
-        
-        if abs_yaw_change > turn_thresh:
-                return "Turn Left" if total_yaw_change > 0 else "Turn Right"
-
-        # norm_vec = np.array([-np.sin(curr_heading), np.cos(curr_heading)])
-        # lat_offsets = [np.dot(p - start_pos, norm_vec) for p in pts]
-        # final_lat_shift = lat_offsets[-1]        
-        # abs_lat_shift = abs(final_lat_shift)
-        # lc_yaw_tolerance = np.deg2rad(20)
-        
-        # if abs_lat_shift > lane_width * 0.5:
-        #     if abs_yaw_change < lc_yaw_tolerance:
-        #         return "Lane Change Left" if final_lat_shift > 0 else "Lane Change Right"
-        #     else:
-        #         return "Go Straight"
-        
-        return "Go Straight"
+        # Classification based on lateral (y) displacement
+        if y_last > y_hard_th:
+            return "<Hard_Left>"
+        elif y_slight_th < y_last <= y_hard_th:
+            return "<Slight_Left>"
+        elif -y_slight_th <= y_last <= y_slight_th:
+            return "<Keep_Straight>"
+        elif -y_hard_th <= y_last < -y_slight_th:
+            return "<Slight_Right>"
+        else: 
+            return "<Hard_Right>"

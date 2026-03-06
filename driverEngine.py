@@ -20,12 +20,11 @@ from transformers import (
     BitsAndBytesConfig
 )
 from datasets import load_dataset
-from trl import SFTTrainer, SFTConfig
 from nuscenes.nuscenes import NuScenes
 from qwen_vl_utils import process_vision_info
 
-from utils.data_utils import preprocess_data, preprocess_data_img, collate_fn, load_config, compute_trajectory_2, filter_to_xy_str
-from utils.caption_utils import reason_generate, parse_waypoints, parse_string
+from utils.data_utils import preprocess_data_img, load_config, compute_trajectory_2, filter_to_xy_str
+from utils.caption_utils import parse_string
 from utils.results_utils import calculate_metrics, format_results, render_frame
 
 class driverEngine():
@@ -145,16 +144,6 @@ class driverEngine():
     def _load_dataset(self):
         print("Loading dataset from:", self.train_data_path)
         raw_dataset = load_dataset("json", data_files=self.train_data_path, split="train")
-        # self.train_dataset = raw_dataset.map(
-        #     preprocess_data,
-        #     batched=True,
-        #     remove_columns=raw_dataset.column_names,
-        #     fn_kwargs={
-        #         "driver_user_prompt": self.driver_user_prompt,
-        #         "system_prompt": self.system_prompt,
-        #         "enable_action": self.enable_action
-        #     },
-        # )
         self.train_dataset = raw_dataset.map(
             preprocess_data_img,
             batched=True,
@@ -190,26 +179,9 @@ class driverEngine():
         self.init_wandb()
         self._load_dataset()
         print(f"Hyperparameters:\n {self.hyper_info}")
-        # output_dir = os.path.join("checkpoints", f"{self.name}_{self.date_str}")
         output_dir = os.path.join("checkpoints", f"{self.name}")
         
-        # SFTTrainer configuration
-        # sft_config = SFTConfig(
-        #     output_dir=output_dir,
-        #     per_device_train_batch_size=self.batch_size,
-        #     gradient_accumulation_steps=self.gradient_accumulation_steps,
-        #     learning_rate=self.learning_rate,
-        #     num_train_epochs=self.epochs,
-        #     lr_scheduler_type=self.lr_scheduler_type,
-        #     optim=self.optimizer,
-        #     weight_decay=self.weight_decay,
-        #     report_to=self.log_to,
-        #     max_length=self.max_length,
-        #     completion_only_loss=True,
-        #     save_strategy="epoch",
-        #     save_total_limit=1
-        # )
-
+        # Trainer configuration
         training_args = TrainingArguments(
             output_dir=output_dir,
             per_device_train_batch_size=self.batch_size,
@@ -240,15 +212,6 @@ class driverEngine():
             enable_image=self.enable_image,
             image_indices=self.image_indices
         )
-        
-        # trainer = SFTTrainer(
-        #     model=self.model,
-        #     args=sft_config,
-        #     train_dataset=self.train_dataset,
-        #     data_collator=collator,
-        #     # processing_class=self.processor,
-        #     peft_config=peft_config
-        # )
 
         trainer = Trainer(
             model=self.model,
@@ -325,7 +288,6 @@ class driverEngine():
         )
                 
     def inference(self, inference_path=None, temperature=0.7, top_p=0.8, num_trajectories=6):
-        # output_dir = os.path.join("results/inference", f"{self.name}_{self.date_str}.jsonl")
         output_dir = os.path.join("results/inference", f"{self.name}.jsonl")
         os.makedirs(os.path.dirname(output_dir), exist_ok=True)
         
@@ -337,16 +299,7 @@ class driverEngine():
             num_samples = len(lines)
             for line in tqdm(lines, desc="Inference"):
                 data = json.loads(line)
-                wp_past = filter_to_xy_str(data['wp_past'])   
-                 
-                # ego_status_prompt = (
-                #     "Current Dynamics:\n"
-                #     f"- Velocity: {data['vel_val']} m/s.\n"
-                #     f"- Yaw Rate: {data['yr_val']} rad/s.\n"
-                #     f"- Acceleration (Longitudinal x, Lateral y): {data['acc_val']} m/s^2.\n"
-                #     f"- Past Trajectory (2Hz): {wp_past} m.\n"
-                #     f"- High-level Command: {data['command']}\n\n"
-                # )
+                wp_past = filter_to_xy_str(data['wp_past'])
 
                 command_str = f"High-level Command: {data['command']}\n" if self.enable_command else ""
                 
@@ -401,18 +354,7 @@ class driverEngine():
                              
                 if torch.cuda.is_available():
                     torch.cuda.synchronize()
-                m_start = time.perf_counter()      
-
-                # # Model Inference
-                # _, output = reason_generate(
-                #     user=full_driver_prompt,
-                #     system=self.system_prompt,
-                #     # images=pil_images,
-                #     processor=self.processor,
-                #     model=self.model,
-                #     do_sample=True,
-                #     max_new_tokens=1024
-                # )     
+                m_start = time.perf_counter()  
                 
                 with torch.no_grad():
                     output_ids = self.model.generate(**inputs, 
@@ -421,7 +363,6 @@ class driverEngine():
                                                      temperature=temperature, 
                                                      top_p=top_p,
                                                      num_return_sequences=num_trajectories)
-                # output = self.processor.decode(output_ids[0][inputs["input_ids"].shape[1]:], skip_special_tokens=True)
                 
                 if torch.cuda.is_available():
                     torch.cuda.synchronize()
@@ -488,8 +429,7 @@ class driverEngine():
 
         print(f"Results saved to: {output_path}")
 
-    def inference_once(self, temperature=0.7, top_p=0.8, sample_index=0):
-        # reason_path = self.train_data_path # include reasons, image related path
+    def inference_once(self, temperature=0.7, top_p=0.8, sample_index=0, is_reason=True):
         eval_path = "data/nuscenes_reasons_val_Qwen_32B.jsonl"
         def get_line(path, index):
             with open(path, 'r', encoding='utf-8') as f:
@@ -498,16 +438,8 @@ class driverEngine():
                         return json.loads(line)
             return None
 
-        # r_data = get_line(eval_path, sample_index)
         data = get_line(eval_path, sample_index)
         token = data['token']
-        # rel_image_paths = data['image_paths']
-        # abs_image_paths = []
-        # for rel_path in rel_image_paths:
-        #     abs_image_paths.append(os.path.join(self.nuscenes_dataroot, rel_path))
-
-        # nusc = self.get_nusc(version="v1.0-trainval")        
-        # vis_img, token, _, _ = render_frame(nusc, r_data)
         
         wp_past = filter_to_xy_str(data['wp_past'])
         command_str = f"High-level Command: {data['command']}\n" if self.enable_command else ""
@@ -520,8 +452,11 @@ class driverEngine():
             f"Past Trajectory (2Hz): {wp_past}\n"
             f"{command_str}\n"
         )
-        reason = data['reasons'][0] if isinstance(data['reasons'], list) else data['reasons']
-        # reason = ""
+        if is_reason:
+            reason = data['reasons'][0] if isinstance(data['reasons'], list) else data['reasons']
+        else:
+            reason = ""
+
         full_driver_prompt = (
             # f"Navigator's Analysis and Instructions:\n{reason}\n\n"
             f"{reason}\n\n"
@@ -629,20 +564,17 @@ class driverEngine():
             "L2_2s": np.nanmean([r['l2_2s'] for r in all_results]),
             "L2_3s": np.nanmean([r['l2_3s'] for r in all_results]),
             "L2_6s": np.nanmean([r['l2_6s'] for r in all_results]),
+            "ADE_3s": np.nanmean([r['ade_3s'] for r in all_results]),
             "ADE_avg": np.mean([r['ade'] for r in all_results]),
             "Failure_Rate": np.mean([r['is_failure'] for r in all_results]) * 100
         }
 
         output_dir = "results"
         os.makedirs(output_dir, exist_ok=True)
-        # output_path = os.path.join(output_dir, f"results_{self.date_str}.txt")
         output_path = os.path.join(output_dir, f"results.txt") # save all results to 
-        # hyper_info = self.hyper_info
         result_text = format_results(avg_metrics, eval_path, len(all_results), self.cfg["Eval"]["threshold"])
         
         with open(output_path, 'a', encoding='utf-8') as f_out:
-            # f_out.write("="*100)
-            # f_out.write(hyper_info)
             f_out.write(result_text)
             f_out.write("="*100 + "\n")
 
@@ -656,7 +588,6 @@ class driverEngine():
         os.makedirs("results/videos", exist_ok=True)
         nuscenes_version = "v1.0-trainval" if eval_path else "v1.0-mini"
         nusc = self.get_nusc(version=nuscenes_version)
-        # output_file = os.path.join("results/videos", f"{self.name}_{self.date_str}.mp4")
         output_file = os.path.join("results/videos", f"{self.name}.mp4")
         
         with open(input_file, 'r') as f:
@@ -691,7 +622,6 @@ class driverEngine():
         os.makedirs("results/images", exist_ok=True)
         nuscenes_version = "v1.0-trainval" if eval_path else "v1.0-mini"
         nusc = self.get_nusc(version=nuscenes_version)
-        # output_dir = os.path.join("results/images", f"{self.name}_{self.date_str}")
         output_dir = os.path.join("results/images", f"{self.name}")
         os.makedirs(output_dir, exist_ok=True)
         

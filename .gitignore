@@ -22,9 +22,10 @@
 
 # Ignore the folders and everything in it
 expired/
+test/
+hprc/
 tb_logs/
 wandb/
-dataset/
 checkpoints/
 results/images/
 results/videos/

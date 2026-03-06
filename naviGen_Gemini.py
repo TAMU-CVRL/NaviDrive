@@ -1,12 +1,10 @@
 import json
 import argparse
 import threading
-import time
-import os
 from pathlib import Path
 from tqdm import tqdm
 from PIL import Image
-from concurrent.futures import ThreadPoolExecutor, as_completed
+from concurrent.futures import ThreadPoolExecutor
 
 from tenacity import retry, stop_after_attempt, wait_random_exponential, retry_if_exception_type
 

@@ -8,6 +8,8 @@ import torch
 from datetime import datetime
 import json
 import textwrap
+import unicodedata
+import re
 
 def save_predicated_waypoints(pre_waypoints, gt_waypoints, index):
     # pre_waypoints: [pre_frames, 3]  nparray
@@ -301,16 +303,17 @@ def calculate_metrics(gt, pred, threshold=2.0):
     
     min_len = min(len(gt), len(pred))
     gt, pred = gt[:min_len], pred[:min_len]
-    
-    # L2 Distance
     errors = np.linalg.norm(gt - pred, axis=1)
     
-    # 1s->idx 1, 2s->idx 3, 3s->idx 5, 6s->idx 11
+    # idx 0=0.5s, 1=1s, 2=1.5s, 3=2s, 4=2.5s, 5=3s...
     metrics = {
         "l2_1s": errors[1] if min_len > 1 else np.nan,
         "l2_2s": errors[3] if min_len > 3 else np.nan,
         "l2_3s": errors[5] if min_len > 5 else np.nan,
-        "l2_6s": errors[11] if min_len > 11 else errors[-1], # 6s is the last point
+        "l2_6s": errors[11] if min_len > 11 else errors[-1],
+        
+        "ade_3s": np.mean(errors[:6]) if min_len >= 6 else np.mean(errors),
+        
         "ade": np.mean(errors)
     }
     
@@ -322,39 +325,40 @@ def calculate_metrics(gt, pred, threshold=2.0):
 def format_results(avg_metrics, input_file, total_samples, threshold):
     date_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     
-    width = 85
+    width = 95
     double_line = "=" * width
     single_line = "-" * width
 
     header_section = (
         f"{double_line}\n"
-        f"  TRAJECTORY EVALUATION REPORT  |  {date_str}\n"
+        f"   TRAJECTORY EVALUATION REPORT  |  {date_str}\n"
         f"{double_line}\n"
-        f"  [Input File]  : {input_file}\n"
-        f"  [Sample Count]: {total_samples}\n"
-        f"  [Failure Thresh] : {threshold} m\n"
+        f"   [Input File]    : {input_file}\n"
+        f"   [Sample Count]  : {total_samples}\n"
+        f"   [Failure Thresh]: {threshold} m\n"
         f"{single_line}\n"
     )
     
     table_header = (
-        f"  {'Metric':<15} | {'1.0s':<10} | {'2.0s':<10} | {'3.0s':<10} | {'6.0s (FDE)':<12} | {'Avg (minADE)':<10}\n"
-        f"  {'-'*15}-|-{'-'*10}-|-{'-'*10}-|-{'-'*10}-|-{'-'*12}-|-{'-'*10}\n"
+        f"   {'Metric':<15} | {'1.0s':<8} | {'2.0s':<8} | {'3.0s':<8} | {'6.0s(FDE)':<10} | {'minADE@3s':<10} | {'minADE(All)':<10}\n"
+        f"   {'-'*15}-|-{'-'*8}-|-{'-'*8}-|-{'-'*8}-|-{'-'*10}-|-{'-'*10}-|-{'-'*10}\n"
     )
     
     table_row = (
-        f"  {'L2 Error (m)':<15} | "
-        f"{avg_metrics['L2_1s']:<10.3f} | "
-        f"{avg_metrics['L2_2s']:<10.3f} | "
-        f"{avg_metrics['L2_3s']:<10.3f} | "
-        f"{avg_metrics['L2_6s']:<12.3f} | "
-        f"{avg_metrics['ADE_avg']:<10.3f}\n"
+        f"   {'L2 Error (m)':<15} | "
+        f"{avg_metrics['L2_1s']:<8.2f} | "
+        f"{avg_metrics['L2_2s']:<8.2f} | "
+        f"{avg_metrics['L2_3s']:<8.2f} | "
+        f"{avg_metrics['L2_6s']:<10.2f} | "
+        f"{avg_metrics['ADE_3s']:<10.2f} | "
+        f"{avg_metrics['ADE_avg']:<10.2f}\n"
     )
     
     summary_section = (
         f"{single_line}\n"
-        f"  {'OVERALL PERFORMANCE':<15}\n"
-        f"  > Failure Rate : {avg_metrics['Failure_Rate']:>6.2f} %\n"
-        f"  > Reliability  : {100 - avg_metrics['Failure_Rate']:>6.2f} % (within {threshold}m)\n"
+        f"   {'OVERALL PERFORMANCE':<15}\n"
+        f"   > Failure Rate : {avg_metrics['Failure_Rate']:>6.2f} %\n"
+        f"   > Reliability  : {100 - avg_metrics['Failure_Rate']:>6.2f} % (within {threshold}m)\n"
         f"{double_line}\n"
     )
     
@@ -402,7 +406,8 @@ def render_frame(nusc, line_data, best_pred=None):
         reason = reason[0] if len(reason) > 0 else ""
     
     if reason:
-        reason = reason.replace('\\n', '\n')
+        reason = format_reasoning_for_cv2(reason)
+
         font = cv2.FONT_HERSHEY_SIMPLEX
         font_scale = 0.55
         thickness = 1
@@ -449,3 +454,33 @@ def render_frame(nusc, line_data, best_pred=None):
                     cv2.putText(vis_img, line_text, (x_pos, y_text), font, font_scale, (255, 255, 255), 1, cv2.LINE_AA)
     
     return vis_img, token, cam_data['width'], cam_data['height']
+
+def format_reasoning_for_cv2(text):
+    if not text:
+        return ""
+    
+    # 1. Handle escaped newlines if the JSON loaded them as literal strings
+    text = text.replace('\\n', '\n')
+    
+    # 2. Pull the text up to the same line as the keywords
+    # \1 refers to whichever keyword it found, adding one clean space after it
+    text = re.sub(r'(Perception:|Action:|Reasoning:)\s*\n\s*', r'\1 ', text)
+    
+    # 3. Swap out OpenCV-breaking Unicode characters
+    replacements = {
+        '\u2019': "'",   # Smart apostrophe
+        '\u2018': "'",   # Left single quote
+        '\u201c': '"',   # Left double quote
+        '\u201d': '"',   # Right double quote
+        '\u2014': '--',  # Em dash
+        '\u2013': '-',   # En dash
+        '\u00b2': '^2',  # Superscript 2 (fixes your m/s^2)
+        '\u2212': '-',   # Math minus sign
+        '\u00b0': ' deg' # Degree symbol
+    }
+    
+    for og_char, ascii_char in replacements.items():
+        text = text.replace(og_char, ascii_char)
+    text = unicodedata.normalize('NFKD', text).encode('ascii', 'ignore').decode('ascii')    
+    
+    return text
