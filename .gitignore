@@ -31,3 +31,6 @@ results/images/
 results/videos/
 results/inference/
 results/inference_single/
+
+# Ignore the files
+naviGen_Gemini.py
