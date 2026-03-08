@@ -1,4 +1,4 @@
-Name: qwen_vl_2B_sft_cmd_no_res
+Name: qwen3_vl_2B_sft_action
 
 Model:
   model_id: Qwen/Qwen3-VL-2B-Instruct
@@ -18,7 +18,10 @@ Dataset:
       2. Trajectory Timing: Output exactly 12 waypoints (except origin (0,0)) representing the next 6 seconds (sampled at 2Hz, 0.5s intervals).
       3. Kinematic Constraints: Ensure the gaps between waypoints are consistent with the current velocity and acceleration. Avoid sudden jumps or unrealistic lateral shifts.
       4. Safety Alignment: The trajectory must strictly follow the Navigator's safety analysis.
-  driver_user_prompt: "Predict the next 12 waypoints: (x1, y1), (x2, y2), ..., (x12, y12)."
+  # driver_user_prompt: "Predict the next 12 waypoints."
+  driver_user_prompt: |
+      Input one front image.
+      Predict the next 11 control actions (acceleration, curvature): (a1, k1), (a2, k2), ..., (a11, k11).
   enable_command: True
 
 Train:
@@ -32,14 +35,14 @@ Train:
   log_to: "wandb"
   max_length: 4096
   LoRA:
-    lora_rank: 8
-    lora_alpha: 16
+    lora_rank: 64
+    lora_alpha: 128
     lora_dropout: 0.05
-  enable_action: False
-  enable_image: False
-  image_indices: None
-  enable_reason: False
-
+  enable_action: True
+  enable_image: True
+  image_indices: [1] # front_left, front, front_right, back_right, back, back_left
+  enable_reason: True
+  
 Eval:
   threshold: 2.0
   video_fps: 2

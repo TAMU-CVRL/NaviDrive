@@ -23,14 +23,12 @@
 # Ignore the folders and everything in it
 expired/
 test/
+reserve/
 hprc/
 tb_logs/
 wandb/
 checkpoints/
-results/images/
-results/videos/
-results/inference/
-results/inference_single/
+results/
 
 # Ignore the files
 naviGen_Gemini.py

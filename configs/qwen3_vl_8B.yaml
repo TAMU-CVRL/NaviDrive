@@ -1,7 +1,7 @@
-Name: qwen_vl_2B_cmd_img_6_no_res
+Name: qwen3_vl_8B
 
 Model:
-  model_id: Qwen/Qwen3-VL-2B-Instruct
+  model_id: Qwen/Qwen3-VL-8B-Instruct
   attention: "flash_attention_2"
   Quantization:
     enable_quantization: False
@@ -22,7 +22,7 @@ Dataset:
   # driver_user_prompt: "Predict the next 12 waypoints."
   driver_user_prompt: |
       Input six images: front_left, front, front_right, back_right, back, back_left
-      Predict the next 12 waypoints: (x1, y1), (x2, y2), ..., (x12, y12).
+      Predict the next 12 waypoints (wihtout the origin): (x1, y1), (x2, y2), ..., (x12, y12).
   enable_command: True
 
 Train:

@@ -1,8 +1,8 @@
-Name: qwen_vl_8B_cmd_img_6_no_res
+Name: default
 
 Model:
-  model_id: Qwen/Qwen3-VL-8B-Instruct
-  attention: "flash_attention_2"
+  model_id: Qwen/Qwen3-VL-2B-Instruct
+  attention: "sdpa" # "flash_attention_2"
   Quantization:
     enable_quantization: False
     load_in_8bit: True # True for 8bit, False for 4bit
@@ -18,11 +18,9 @@ Dataset:
       2. Trajectory Timing: Output exactly 12 waypoints (except origin (0,0)) representing the next 6 seconds (sampled at 2Hz, 0.5s intervals).
       3. Kinematic Constraints: Ensure the gaps between waypoints are consistent with the current velocity and acceleration. Avoid sudden jumps or unrealistic lateral shifts.
       4. Safety Alignment: The trajectory must strictly follow the Navigator's safety analysis.
-      5. Output Format: Only output the coordinates: (x1, y1), (x2, y2), ..., (x12, y12).
-  # driver_user_prompt: "Predict the next 12 waypoints."
   driver_user_prompt: |
-      Input six images: front_left, front, front_right, back_right, back, back_left
-      Predict the next 12 waypoints (wihtout the origin): (x1, y1), (x2, y2), ..., (x12, y12).
+      Input one front image.
+      Predict the next 12 waypoints: (x1, y1), (x2, y2), ..., (x12, y12).
   enable_command: True
 
 Train:
@@ -40,10 +38,11 @@ Train:
     lora_alpha: 128
     lora_dropout: 0.05
   enable_action: False
-  enable_image: True
-  image_indices: [0, 1, 2, 3, 4, 5] # front_left, front, front_right, back_right, back, back_left
-  enable_reason: False
+  enable_image: False
+  image_indices: [1] # front_left, front, front_right, back_right, back, back_left
+  enable_reason: True
   
 Eval:
   threshold: 2.0
   video_fps: 2
+

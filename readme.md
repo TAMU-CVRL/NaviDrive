@@ -1,3 +1,5 @@
+# NaviDriveVLM: Decoupling High-Level Reasoning and Motion Planning for Autonomous Driving
+
 # Environment
 ```
 pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121
