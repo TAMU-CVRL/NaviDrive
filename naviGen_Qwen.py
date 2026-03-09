@@ -127,7 +127,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Train a samll-size driver LLM")
     parser.add_argument("--model_id", type=str, default="Qwen/Qwen3-VL-8B-Instruct", help="Path to the configuration YAML file")
     parser.add_argument("--output_file", type=str, default="data/nuscenes_reasons_train.jsonl", help="Path to the configuration YAML file")
-    parser.add_argument("--data_path", type=str, default="/home/ximeng/Dataset/nuscenes_full_v1_0/", help="Path to the NuScenes dataset")
+    parser.add_argument("--data_path", type=str, required=True, help="Path to the NuScenes dataset")
     parser.add_argument("--version", type=str, default="v1.0-trainval", choices=['v1.0-mini', 'v1.0-trainval'], help="Version of NuScenes dataset")
     parser.add_argument("--is_train", type=int, default=0, help="Whether to generate training data")
     parser.add_argument("--num_reasons", type=int, default=1, help="Number of reasons to generate")

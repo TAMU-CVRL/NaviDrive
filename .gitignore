@@ -5,7 +5,6 @@
 *.h5
 
 # ignore dataset files
-*.png
 *.npy
 *.tar
 *.tmp
@@ -25,6 +24,7 @@ expired/
 test/
 reserve/
 hprc/
+demo/
 tb_logs/
 wandb/
 checkpoints/
@@ -32,3 +32,4 @@ results/
 
 # Ignore the files
 naviGen_Gemini.py
+.gitleaks.toml
