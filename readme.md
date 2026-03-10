@@ -3,6 +3,8 @@
 Overview of NaviDriveVLM. The system is decoupled into two modules, the Navigator and the Driver. The Navigator is a large-scale VLM responsible for scene understanding and high-level reasoning. The Driver is a lightweight VLM, which enables efficient fully supervised fine-tuning (SFT) as a driving expert for future waypoint prediction.
 ![pipeline](./figures/pipeline.jpg)
 <!-- <img src="./figures/pipeline.jpg" alt="overview" width="1000" align="center" /> -->
+[arXiv](https://arxiv.org/abs/2603.07901)|[BibTeX](#bibtex)
+
 Examples:
 ![results](./figures/results.png)
 ## Requirements
@@ -93,3 +95,16 @@ To generate a visualization video, specify the start and end indices of the fram
 python3 eval.py --config configs/default.yaml --eval_video True --start_idx 0 --end_idx 2000
 ```
 The generated video will be stored in `results/videos`.
+
+## BibTeX
+```
+@misc{tao2026navidrive,
+      title={NaviDriveVLM: Decoupling High-Level Reasoning and Motion Planning for Autonomous Driving}, 
+      author={Ximeng Tao and Pardis Taghavi and Dimitar Filev and Reza Langari and Gaurav Pandey},
+      year={2026},
+      eprint={2603.07901},
+      archivePrefix={arXiv},
+      primaryClass={cs.RO},
+      url={https://arxiv.org/abs/2603.07901}, 
+}
+```
