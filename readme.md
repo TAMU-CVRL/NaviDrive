@@ -1,9 +1,13 @@
 # NaviDriveVLM: Decoupling High-Level Reasoning and Motion Planning for Autonomous Driving
+[![arXiv](https://img.shields.io/badge/arXiv-2603.07901-b31b1b.svg)](https://arxiv.org/abs/2603.07901)
+[![Hugging Face Model](https://img.shields.io/badge/%F0%9F%A4%97%20Hugging%20Face-Model-FFD21E)](https://huggingface.co/Ximeng0831/NaviDrive-Qwen3-VL-2B-SFT)
+[![Hugging Face Dataset](https://img.shields.io/badge/%F0%9F%A4%97%20Hugging%20Face-Dataset-blue)](https://huggingface.co/datasets/Ximeng0831/NaviDrive-Reasoning)
+[![GitHub](https://img.shields.io/badge/GitHub-NaviDrive-lightgrey?logo=github)](https://github.com/TAMU-CVRL/NaviDrive)
 ## Overview
 Overview of NaviDriveVLM. The system is decoupled into two modules, the Navigator and the Driver. The Navigator is a large-scale VLM responsible for scene understanding and high-level reasoning. The Driver is a lightweight VLM, which enables efficient fully supervised fine-tuning (SFT) as a driving expert for future waypoint prediction.
 ![pipeline](./figures/pipeline.jpg)
 <!-- <img src="./figures/pipeline.jpg" alt="overview" width="1000" align="center" /> -->
-[arXiv](https://arxiv.org/abs/2603.07901)|[BibTeX](#bibtex)
+<!-- [arXiv](https://arxiv.org/abs/2603.07901)|[BibTeX](#bibtex) -->
 
 Examples:
 ![results](./figures/results.png)
@@ -82,6 +86,9 @@ The predicted waypoints will be saved in `results/inference` for further evaluat
 ``` bash
 python3 eval.py --config configs/default.yaml --inference_path data/nuscenes_reasons_val_Qwen_32B.jsonl
 ```
+
+A fine-tuned model and the corresponding dataset are available on Hugging Face.
+For quick inference, please refer to this [page](https://huggingface.co/Ximeng0831/NaviDrive-Qwen3-VL-2B-SFT).
 ## Evaluation
 ### L2 Error
 To evaluate the L2 error:
@@ -97,6 +104,7 @@ python3 eval.py --config configs/default.yaml --eval_video True --start_idx 0 --
 The generated video will be stored in `results/videos`.
 
 ## BibTeX
+If you find this work useful for your research, please cite our work:
 ```
 @misc{tao2026navidrive,
       title={NaviDriveVLM: Decoupling High-Level Reasoning and Motion Planning for Autonomous Driving}, 
