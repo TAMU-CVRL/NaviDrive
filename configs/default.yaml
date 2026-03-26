@@ -31,7 +31,7 @@ Train:
   lr_scheduler_type: "cosine"
   optimizer: "adamw_torch"
   weight_decay: 0.01
-  log_to: "wandb"
+  log_to: "wandb" # "none"
   max_length: 4096
   LoRA:
     lora_rank: 64
@@ -39,7 +39,7 @@ Train:
     lora_dropout: 0.05
   enable_action: False
   enable_image: True
-  image_indices: [1] # front_left, front, front_right, back_right, back, back_left
+  image_indices: [3] # ["CAM_BACK", "CAM_BACK_LEFT", "CAM_FRONT_LEFT", "CAM_FRONT", "CAM_FRONT_RIGHT", "CAM_BACK_RIGHT"]
   enable_reason: True
   
 Eval:

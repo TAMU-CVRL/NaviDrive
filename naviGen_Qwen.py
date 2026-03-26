@@ -44,7 +44,7 @@ def reasonGen(model_id, data_path, output_file, version, system_prompt, is_train
                 future_waypoints = sample['future_waypoints']
                 # command = sample['command']
                 image_paths = sample['image_paths'][-1] # Get the latest frame image paths
-                
+                # Change the order of the images
                 new_order = [2, 3, 4, 5, 0, 1] # front_left, front, front_right, back_right, back, back_left
                 current_images = raw_images[-1]
                 pil_images = []

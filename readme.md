@@ -11,8 +11,23 @@ Overview of NaviDriveVLM. The system is decoupled into two modules, the Navigato
 
 Examples:
 ![results](./figures/results.png)
+
+To run a quick inference demo, clone the repository, set up the environment, and execute the notebook located at [`demo/inference.ipynb`](https://github.com/TAMU-CVRL/NaviDrive/demo/inference.ipynb).
+
 ## Requirements
-We can create a [conda](https://docs.conda.io/en/latest/) environment named `navidrive`:
+
+### Option 1: Automatic Setup
+
+The provided script can be used to set up the environment:
+
+```bash
+chmod +x ./scripts/setup_env.sh
+./scripts/setup_env.sh
+```
+### Option 2: Manual Setup
+
+Create a new [Conda]((https://docs.conda.io/en/latest/)) environment named `navidrive`:
+
 ``` bash
 conda create -n navidrive python=3.10
 ```
@@ -24,9 +39,9 @@ Install [PyTorch](https://pytorch.org/get-started/locally/) based on your GPU:
 ``` bash
 pip install torch torchvision --index-url https://download.pytorch.org/whl/cu126
 ```
-Install other libraries:
+Install the remaining dependencies:
 ``` bash
-pip install transformers==5.1.0 accelerate==1.12.0 peft==0.18.1 "bitsandbytes>=0.46.1" opencv-python==4.11.0.86 nuscenes-devkit qwen-vl-utils
+pip install transformers==5.1.0 datasets==4.5.0 accelerate==1.12.0 peft==0.18.1 "bitsandbytes>=0.46.1" opencv-python==4.11.0.86 nuscenes-devkit==1.2.0 qwen-vl-utils==0.0.14 beautifulsoup4==4.14.3 typeguard==4.5.1 wandb==0.25.1 tensorboard==2.20.0
 ```
 - Flash-attention
 FlashAttention is optional in the configuration YAML file. If you would like to enable it, please follow the FlashAttention [README](https://github.com/Dao-AILab/flash-attention?tab=readme-ov-file#installation-and-features) for installation instructions.
@@ -51,7 +66,8 @@ Arguments:
   - `0`: training set
   - `1`: validation set  
 
-Metadata Format:
+The dataset is available on Hugging Face and can be loaded using the `load_dataset` function. For more details, please refer to the [dataset page](https://huggingface.co/datasets/Ximeng0831/NaviDrive-Reasoning).
+<!-- Metadata Format:
 ``` json
 {
   "token": ["token"],
@@ -65,7 +81,7 @@ Metadata Format:
   "image_paths": ["str x 6"],
   "reasons": ["str x 1"]
 }
-```
+``` -->
 ## Training Models
 Run `train.py` to train a model. It only requires one argument: `--config`.
 ``` bash
@@ -80,15 +96,17 @@ Configuration files are stored in the `configs` folder. Key arguments include:
 - **`enable_image`**: Whether to include image inputs.
 - **`enable_reason`**: Whether to include reasoning inputs.
 
+The fine-tuned model is available on Hugging Face and can be loaded directly. For quick inference, please refer to the [model page](https://huggingface.co/Ximeng0831/NaviDrive-Qwen3-VL-2B-SFT).
+
 ## Inference
-After training a model, you can run the following command to perform inference. 
+After training a model, we can run the following command to perform inference. 
 The predicted waypoints will be saved in `results/inference` for further evaluation.
 ``` bash
 python3 eval.py --config configs/default.yaml --inference_path data/nuscenes_reasons_val_Qwen_32B.jsonl
 ```
 
-A fine-tuned model and the corresponding dataset are available on Hugging Face.
-For quick inference, please refer to this [page](https://huggingface.co/Ximeng0831/NaviDrive-Qwen3-VL-2B-SFT).
+<!-- A fine-tuned model and the corresponding dataset are available on Hugging Face.
+For quick inference, please refer to this [page](https://huggingface.co/Ximeng0831/NaviDrive-Qwen3-VL-2B-SFT). -->
 ## Evaluation
 ### L2 Error
 To evaluate the L2 error:

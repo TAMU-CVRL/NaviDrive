@@ -67,7 +67,7 @@ class driverEngine():
         
     def init_wandb(self):
         wandb.init(
-            project="dllm",
+            project="navidrive",
             # name=self.name + "_" + self.date_str,
             name=self.name,
             config={
@@ -468,7 +468,7 @@ class driverEngine():
             image_paths = [os.path.join(self.nuscenes_dataroot, p) for p in data['image_paths']]
             if self.image_indices:
                 image_paths = [image_paths[i] for i in self.image_indices]
-            
+                # print(f"Using image paths: {image_paths}")
             prompt_messages = [
                 {"role": "system", "content": self.system_prompt},
                 {"role": "user", "content": [{"type": "image", "image": p} for p in image_paths] + 
@@ -703,7 +703,7 @@ class dataCollator():
         for item in batch:
             text_prompt = item['prompt']
             completion = item['completion']
-            image_paths = item['image_paths']
+            image_paths = item['image_paths'] # raw image paths, without reorder: ["CAM_BACK", "CAM_BACK_LEFT", "CAM_FRONT_LEFT", "CAM_FRONT", "CAM_FRONT_RIGHT", "CAM_BACK_RIGHT"]
 
             user_content = []
             if self.enable_image:

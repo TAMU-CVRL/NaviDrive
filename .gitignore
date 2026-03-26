@@ -24,7 +24,6 @@ expired/
 test/
 reserve/
 hprc/
-demo/
 tb_logs/
 wandb/
 checkpoints/
