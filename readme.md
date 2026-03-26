@@ -12,7 +12,7 @@ Overview of NaviDriveVLM. The system is decoupled into two modules, the Navigato
 Examples:
 ![results](./figures/results.png)
 
-To run a quick inference demo, clone the repository, set up the environment, and execute the notebook located at [`demo/inference.ipynb`](https://github.com/TAMU-CVRL/NaviDrive/demo/inference.ipynb).
+To run a quick inference demo, clone the repository, set up the environment, and execute the notebook located at [`demo/inference.ipynb`](https://github.com/TAMU-CVRL/NaviDrive/blob/main/demo/inference.ipynb).
 
 ## Requirements
 
@@ -26,7 +26,7 @@ chmod +x ./scripts/setup_env.sh
 ```
 ### Option 2: Manual Setup
 
-Create a new [Conda]((https://docs.conda.io/en/latest/)) environment named `navidrive`:
+Create a new [Conda](https://docs.conda.io/en/latest/) environment named `navidrive`:
 
 ``` bash
 conda create -n navidrive python=3.10
