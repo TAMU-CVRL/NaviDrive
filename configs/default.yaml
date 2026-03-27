@@ -45,4 +45,3 @@ Train:
 Eval:
   threshold: 2.0
   video_fps: 2
-

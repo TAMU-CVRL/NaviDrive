@@ -37,7 +37,8 @@ pip install transformers==5.1.0 \
             beautifulsoup4==4.14.3 \
             typeguard==4.5.1 \
             wandb==0.25.1 \
-            tensorboard==2.20.0
+            tensorboard==2.20.0 \
+            ipykernel
 
 echo "Environment setup is complete!"
 echo "Please run the following command in your terminal to activate and use it:"

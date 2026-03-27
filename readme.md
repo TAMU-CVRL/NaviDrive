@@ -41,7 +41,7 @@ pip install torch torchvision --index-url https://download.pytorch.org/whl/cu126
 ```
 Install the remaining dependencies:
 ``` bash
-pip install transformers==5.1.0 datasets==4.5.0 accelerate==1.12.0 peft==0.18.1 "bitsandbytes>=0.46.1" opencv-python==4.11.0.86 nuscenes-devkit==1.2.0 qwen-vl-utils==0.0.14 beautifulsoup4==4.14.3 typeguard==4.5.1 wandb==0.25.1 tensorboard==2.20.0
+pip install transformers==5.1.0 datasets==4.5.0 accelerate==1.12.0 peft==0.18.1 "bitsandbytes>=0.46.1" opencv-python==4.11.0.86 nuscenes-devkit==1.2.0 qwen-vl-utils==0.0.14 beautifulsoup4==4.14.3 typeguard==4.5.1 wandb==0.25.1 tensorboard==2.20.0 ipykernel
 ```
 - Flash-attention
 FlashAttention is optional in the configuration YAML file. If you would like to enable it, please follow the FlashAttention [README](https://github.com/Dao-AILab/flash-attention?tab=readme-ov-file#installation-and-features) for installation instructions.
