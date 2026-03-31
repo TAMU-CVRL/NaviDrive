@@ -21,8 +21,7 @@ To run a quick inference demo, clone the repository, set up the environment, and
 The provided script can be used to set up the environment:
 
 ```bash
-chmod +x ./scripts/setup_env.sh
-./scripts/setup_env.sh
+bash ./scripts/setup_env.sh
 ```
 ### Option 2: Manual Setup
 
@@ -41,7 +40,7 @@ pip install torch torchvision --index-url https://download.pytorch.org/whl/cu126
 ```
 Install the remaining dependencies:
 ``` bash
-pip install transformers==5.1.0 datasets==4.5.0 accelerate==1.12.0 peft==0.18.1 "bitsandbytes>=0.46.1" opencv-python==4.11.0.86 nuscenes-devkit==1.2.0 qwen-vl-utils==0.0.14 beautifulsoup4==4.14.3 typeguard==4.5.1 wandb==0.25.1 tensorboard==2.20.0 ipykernel==7.2.0 ipywidgets==8.1.8 pickleshare==0.7.5
+pip install transformers==5.1.0 datasets==4.5.0 accelerate==1.12.0 peft==0.18.1 "bitsandbytes>=0.46.1" opencv-python==4.11.0.86 nuscenes-devkit==1.2.0 qwen-vl-utils==0.0.14 beautifulsoup4==4.14.3 typeguard==4.5.1 wandb==0.25.1 tensorboard==2.20.0 ipykernel==7.2.0 ipywidgets==8.1.8 pickleshare==0.7.5 pyrootutils==1.0.4 jmespath==1.1.0
 ```
 - Flash-attention
 FlashAttention is optional in the configuration YAML file. If you would like to enable it, please follow the FlashAttention [README](https://github.com/Dao-AILab/flash-attention?tab=readme-ov-file#installation-and-features) for installation instructions.
@@ -55,7 +54,7 @@ The `data` folder already includes several pairs of `.jsonl` files used for trai
 
 If you would like to generate reasoning data from the nuScenes dataset, run the following command:
 ``` bash
-pyhotn3 naviGen_Qwen.py --model_id Qwen/Qwen3-VL-32B-Instruct --output_file data/nuscenes_reasons_Qwen_32B.jsonl --data_path /PATH/TO/NUSCENES/DATASET --version v1.0-trainval --is_train 0
+python3 naviGen_Qwen.py --model_id Qwen/Qwen3-VL-32B-Instruct --output_file data/nuscenes_reasons_Qwen_32B.jsonl --data_path /PATH/TO/NUSCENES/DATASET --version v1.0-trainval --is_train 0
 ```
 Arguments:
 - **`--model_id`**: Model ID from Hugging Face.

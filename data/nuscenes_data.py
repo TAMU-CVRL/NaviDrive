@@ -95,7 +95,7 @@ class NuscenesData(Dataset):
         data['yaw_rate'] = torch.stack(data['yaw_rate'], dim=0)  # [pre_frames]
         if self.future_frames != 0:
             data['future_waypoints'] = torch.cat(data['future_waypoints'], dim=0) # [batch_size, future_frames, waypoint]
-        data['command'] = self.classify_command(data['future_waypoints'], data['cur_waypoint']) # [batch_size, command]   
+        data['command'] = self.classify_command(data['future_waypoints']) # [batch_size, command]   
         return data
     
     # Get splits scenes
@@ -289,11 +289,11 @@ class NuscenesData(Dataset):
         return all_instances
 
     def classify_command(self, future_waypoints, x_stop_th=5.0, y_slight_th=2.0, y_hard_th=5.0):
+        # future_waypoints shape is [future_frames, 3], where 3 is (x, y, yaw)
+        data = future_waypoints.cpu().numpy() if isinstance(future_waypoints, torch.Tensor) else future_waypoints
         # Get the very last point from the tensor/array
-        # Assuming shape [N, 3] where 3 is (x, y, yaw)
-        data = future_waypoints.numpy() if isinstance(future_waypoints, torch.Tensor) else future_waypoints
-        last_pt = data[-1]
-        x_last, y_last = last_pt[0], last_pt[1]
+        x_last = data[-1, 0]
+        y_last = data[-1, 1]
 
         if x_last <= x_stop_th:
             return "<Decelerate_Stop>"

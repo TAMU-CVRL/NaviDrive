@@ -30,7 +30,7 @@ def reasonGen(model_id, data_path, output_file, version, system_prompt, is_train
     indices = range(start_idx, end_idx)
     print(f"Shard {shard_id}/{total_shards}: Processing samples from {start_idx} to {end_idx}...")
     
-    with open(output_file, 'a', encoding='utf-8') as f:
+    with open(output_file, 'w', encoding='utf-8') as f:
         for i in tqdm(indices):
             try:
                 sample = dataset[i]
@@ -42,7 +42,7 @@ def reasonGen(model_id, data_path, output_file, version, system_prompt, is_train
                 acceleration = sample['accel']
                 yaw_rate = sample['yaw_rate']
                 future_waypoints = sample['future_waypoints']
-                # command = sample['command']
+                command = sample['command']
                 image_paths = sample['image_paths'][-1] # Get the latest frame image paths
                 # Change the order of the images
                 new_order = [2, 3, 4, 5, 0, 1] # front_left, front, front_right, back_right, back, back_left
@@ -66,8 +66,8 @@ def reasonGen(model_id, data_path, output_file, version, system_prompt, is_train
                     f"- Velocity: {vel_val:.2f} m/s.\n"
                     f"- Yaw Rate: {yr_val:.2f} rad/s.\n"
                     f"- Acceleration (Longitudinal x, Lateral y): ({acc_val[0]:.2f}, {acc_val[1]:.2f}) m/s^2.\n"
-                    f"- Past Trajectory (2Hz): {wp_past} m.\n\n"
-                    # f"- High-level Command: {command}\n"
+                    f"Past Trajectory (2Hz): {wp_past} m.\n"
+                    f"High-level Command: {command}\n\n"
                 )
                 
                 user_prompt = (
@@ -102,6 +102,7 @@ def reasonGen(model_id, data_path, output_file, version, system_prompt, is_train
                 
                 data_record = {
                     "token": token,
+                    "command": command,
                     "wp_past": wp_past,
                     "wp_future": wp_future,
                     "vel_val": vel_val,
@@ -109,7 +110,6 @@ def reasonGen(model_id, data_path, output_file, version, system_prompt, is_train
                     "yr_val": yr_val,
                     "action_past": action_past,
                     "action_future": action_future,
-                    # "command": command, # not accurate
                     "image_paths": image_paths,
                     "reasons": reasons
                 }

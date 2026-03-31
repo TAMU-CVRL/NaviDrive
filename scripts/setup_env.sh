@@ -41,6 +41,8 @@ pip install transformers==5.1.0 \
             ipykernel==7.2.0 \
             ipywidgets==8.1.8 \
             pickleshare==0.7.5 \
+            pyrootutils==1.0.4 \
+            jmespath==1.1.0 \
 
 echo "Environment setup is complete!"
 echo "Please run the following command in your terminal to activate and use it:"
