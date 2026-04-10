@@ -1,10 +1,10 @@
-Name: qwen3_vl_2B_sft_cmd
+Name: qwen3_vl_2B_sft_qlora
 
 Model:
   model_id: Qwen/Qwen3-VL-2B-Instruct
   attention: "sdpa" # "flash_attention_2"
   Quantization:
-    enable_quantization: False
+    enable_quantization: True
     load_in_8bit: True # True for 8bit, False for 4bit
 
 Dataset:
@@ -31,18 +31,17 @@ Train:
   lr_scheduler_type: "cosine"
   optimizer: "adamw_torch"
   weight_decay: 0.01
-  log_to: "wandb"
+  log_to: "wandb" # "none"
   max_length: 4096
   LoRA:
     lora_rank: 64
     lora_alpha: 128
     lora_dropout: 0.05
   enable_action: False
-  enable_image: False
+  enable_image: True
   image_indices: [3] # ["CAM_BACK", "CAM_BACK_LEFT", "CAM_FRONT_LEFT", "CAM_FRONT", "CAM_FRONT_RIGHT", "CAM_BACK_RIGHT"]
   enable_reason: True
   
 Eval:
   threshold: 2.0
   video_fps: 2
-

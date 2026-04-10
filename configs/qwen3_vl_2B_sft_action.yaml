@@ -2,7 +2,7 @@ Name: qwen3_vl_2B_sft_action
 
 Model:
   model_id: Qwen/Qwen3-VL-2B-Instruct
-  attention: "flash_attention_2"
+  attention: "sdpa" # "flash_attention_2"
   Quantization:
     enable_quantization: False
     load_in_8bit: True # True for 8bit, False for 4bit

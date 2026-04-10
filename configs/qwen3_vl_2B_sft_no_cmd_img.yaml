@@ -1,4 +1,4 @@
-Name: default
+Name: qwen3_vl_2B_sft_no_cmd_img
 
 Model:
   model_id: Qwen/Qwen3-VL-2B-Instruct
